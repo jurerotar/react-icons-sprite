@@ -1,0 +1,80 @@
+{
+  "name": "react-icons-sprite",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "",
+  "author": "Jure Rotar <hello@jurerotar.com>",
+  "homepage": "https://github.com/jurerotar/react-icons-sprite#README",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/icon.d.ts",
+      "import": "./dist/icon.js",
+      "default": "./dist/icon.js"
+    },
+    "./vite": {
+      "types": "./dist/vite/plugin.d.ts",
+      "import": "./dist/vite/plugin.js",
+      "default": "./dist/vite/plugin.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jurerotar/react-icons-sprite.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jurerotar/react-icons-sprite/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "format": "biome format . --write",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --apply",
+    "prepublishOnly": "npm run build",
+    "release": "npm publish --access public"
+  },
+  "peerDependencies": {
+    "react": ">= 16",
+    "react-dom": ">= 16",
+    "react-icons": ">= 5"
+  },
+  "devDependencies": {
+    "@babel/generator": "7.28.3",
+    "@babel/parser": "7.28.3",
+    "@babel/traverse": "7.28.3",
+    "@babel/types": "7.28.2",
+    "@biomejs/biome": "2.2.2",
+    "@types/babel__generator": "7.27.0",
+    "@types/babel__traverse": "7.28.0",
+    "@types/react-dom": "19.1.9",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "react-icons": "5.5.0",
+    "tsdown": "0.14.2",
+    "typescript": "5.9.2",
+    "vite": "7.1.3"
+  },
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "rollup",
+    "rolldown",
+    "react-icons",
+    "react",
+    "icons",
+    "svg",
+    "svg-sprite",
+    "spritesheet",
+    "icon-sprite"
+  ]
+}
