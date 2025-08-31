@@ -38,8 +38,8 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "format": "biome format . --write",
-    "lint": "biome check .",
-    "lint:fix": "biome check . --apply",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint . --write",
     "prepublishOnly": "npm run build",
     "release": "npm publish --access public"
   },

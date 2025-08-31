@@ -16,7 +16,6 @@ export const ReactIconsSpriteIcon = ({ iconId, ...rest }: IconProps) => {
       viewBox="0 0 24 24"
       {...rest}
     >
-      <title>{iconId}</title>
       <use href={iconHref} />
     </svg>
   );

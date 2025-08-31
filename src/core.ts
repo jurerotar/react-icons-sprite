@@ -3,8 +3,16 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { IconType } from 'react-icons';
 import * as t from '@babel/types';
 import { parse } from '@babel/parser';
-import traverse, { type NodePath } from '@babel/traverse';
-import generate from '@babel/generator';
+import _traverse, { type NodePath } from '@babel/traverse';
+import _generate, { type GeneratorResult } from '@babel/generator';
+
+type BabelTraverse = typeof import('@babel/traverse');
+type BabelGenerate = typeof import('@babel/generator');
+
+export const traverse =
+  (_traverse as unknown as BabelTraverse).default ?? _traverse;
+export const generate =
+  (_generate as unknown as BabelGenerate).default ?? _generate;
 
 export const PLACEHOLDER = '__SPRITE_URL_PLACEHOLDER__';
 export const ICON_SOURCE = 'react-icons-sprite';
@@ -71,7 +79,9 @@ export const findExistingIconImport = (ast: t.File) => {
           break;
         }
       }
-      if (hasIconImport) break;
+      if (hasIconImport) {
+        break;
+      }
     }
   }
 
@@ -97,12 +107,18 @@ export const replaceJsxWithSprite = (
   traverse(ast, {
     JSXOpeningElement(path: NodePath<t.JSXOpeningElement>) {
       const name = path.node.name;
-      if (!t.isJSXIdentifier(name)) return;
+      if (!t.isJSXIdentifier(name)) {
+        return;
+      }
 
       const local = name.name;
       const meta = localNameToImport.get(local);
-      if (!meta) return;
-      if (isAlreadyIcon(name)) return;
+      if (!meta) {
+        return;
+      }
+      if (isAlreadyIcon(name)) {
+        return;
+      }
 
       // Swap tag name
       path.node.name = t.jSXIdentifier(iconLocalName);
@@ -128,9 +144,13 @@ export const replaceJsxWithSprite = (
 
     JSXClosingElement(path: NodePath<t.JSXClosingElement>) {
       const name = path.node.name;
-      if (!t.isJSXIdentifier(name)) return;
+      if (!t.isJSXIdentifier(name)) {
+        return;
+      }
       const local = name.name;
-      if (!localNameToImport.has(local)) return;
+      if (!localNameToImport.has(local)) {
+        return;
+      }
       if (!isAlreadyIcon(name)) {
         path.node.name = t.jSXIdentifier(iconLocalName);
       }
@@ -173,7 +193,9 @@ export const pruneUsedSpecifiers = (
 ) => {
   for (const { decl } of new Set([...localNameToImport.values()])) {
     decl.specifiers = decl.specifiers.filter((s) => {
-      if (!t.isImportSpecifier(s) || !t.isIdentifier(s.local)) return true;
+      if (!t.isImportSpecifier(s) || !t.isIdentifier(s.local)) {
+        return true;
+      }
       return !usedLocalNames.has(s.local.name);
     });
   }
@@ -195,7 +217,7 @@ export const transformModule = (
   code: string,
   id: string,
   register: (pack: string, exportName: string) => void,
-): { code: string; map: any; anyReplacements: boolean } => {
+): GeneratorResult & { anyReplacements: boolean } => {
   const ast = parseAst(code, id);
   const localNameToImport = collectReactIconImports(ast);
   if (localNameToImport.size === 0) {
@@ -262,11 +284,13 @@ export const renderOneIcon = async (pack: string, exportName: string) => {
   const attrs: string[] = [];
   for (const [, k, v] of svgAttrsRaw.matchAll(ATTR_RE)) {
     const key = k.toLowerCase();
-    if (PRESENTATION_ATTRS.has(key)) attrs.push(`${key}="${v}"`);
+    if (PRESENTATION_ATTRS.has(key)) {
+      attrs.push(`${key}="${v}"`);
+    }
   }
 
   const inner = html.replace(/^<svg[^>]*>/i, '').replace(/<\/svg>\s*$/i, '');
-  const stylePart = attrs.length ? ' ' + attrs.join(' ') : '';
+  const stylePart = attrs.length ? ` ${attrs.join(' ')}` : '';
   const symbol = `<symbol id="${id}" viewBox="${viewBox}"${stylePart}>${inner}</symbol>`;
 
   return {

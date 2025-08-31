@@ -15,41 +15,39 @@ export type ReactIconsSpriteVitePluginOptions = {
 };
 
 export const reactIconsSprite = (
-  options: ReactIconsSpriteVitePluginOptions = {}
+  options: ReactIconsSpriteVitePluginOptions = {},
 ): Plugin => {
   const { spriteUrlVersion } = options;
 
   const collector = createCollector();
-  let isBuild = false;
 
   return {
     name: 'vite-plugin-react-icons-sprite',
     enforce: 'pre',
-
-    configResolved(cfg) {
-      isBuild = cfg.command === 'build';
-    },
+    apply: 'build',
 
     buildStart() {
       collector.clear();
     },
 
     transform(code, id) {
-      if (!isBuild) {
-        return null;
-      }
-
       const cleanId = id.split('?', 1)[0];
       if (!/\.(mjs|cjs|js|jsx|ts|tsx)$/.test(cleanId)) {
         return null;
       }
 
+      if (!/from\s+['"]react-icons\//.test(code)) {
+        return null;
+      }
+
       try {
-        const { code: next, map, anyReplacements } = transformModule(
-          code,
-          id,
-          (pack, exportName) => collector.add(pack, exportName)
-        );
+        const {
+          code: next,
+          map,
+          anyReplacements,
+        } = transformModule(code, id, (pack, exportName) => {
+          collector.add(pack, exportName);
+        });
         if (!anyReplacements) {
           return null;
         }
@@ -57,17 +55,14 @@ export const reactIconsSprite = (
           code: next,
           map,
         };
-      } catch {
+      } catch (error) {
+        console.error(error);
         // If parsing fails, skip transforming this module.
         return null;
       }
     },
 
     async generateBundle(this, _options, bundle) {
-      if (!isBuild) {
-        return;
-      }
-
       const spriteXml = await buildSprite(collector.toList());
 
       const assetId = this.emitFile({
@@ -79,8 +74,8 @@ export const reactIconsSprite = (
 
       const finalUrl =
         spriteUrlVersion && spriteUrlVersion.length > 0
-          ? `${fileName}?v=${encodeURIComponent(spriteUrlVersion)}`
-          : fileName;
+          ? `/${fileName}?v=${encodeURIComponent(spriteUrlVersion)}`
+          : `/${fileName}`;
 
       for (const [, item] of Object.entries(bundle)) {
         if (item.type === 'chunk' && typeof item.code === 'string') {
@@ -91,4 +86,4 @@ export const reactIconsSprite = (
       }
     },
   };
-}
+};
