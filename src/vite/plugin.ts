@@ -12,12 +12,18 @@ export type ReactIconsSpriteVitePluginOptions = {
    * Example: { spriteUrlVersion: "1.2.3" } -> "/assets/react-icons-sprite.svg?v=1.2.3"
    */
   spriteUrlVersion?: string;
+  /**
+   * If passed, this exact string will be used for the emitted file name.
+   * If fileName is omitted, name will be generated as `react-icons-sprite-[hash].svg.
+   * This is useful when, for example, multiple sprite sheets are generated during client and server builds.
+   */
+  fileName?: string;
 };
 
 export const reactIconsSprite = (
   options: ReactIconsSpriteVitePluginOptions = {},
 ): Plugin => {
-  const { spriteUrlVersion } = options;
+  const { spriteUrlVersion, fileName } = options;
 
   const collector = createCollector();
 
@@ -65,17 +71,24 @@ export const reactIconsSprite = (
     async generateBundle(this, _options, bundle) {
       const spriteXml = await buildSprite(collector.toList());
 
-      const assetId = this.emitFile({
+      const emitFileOptions: Parameters<typeof this.emitFile>[0] = {
         type: 'asset',
-        name: 'react-icons-sprite.svg',
         source: spriteXml,
-      });
-      const fileName = this.getFileName(assetId);
+      };
+
+      if (fileName) {
+        emitFileOptions.fileName = fileName;
+      } else {
+        emitFileOptions.name = 'react-icons-sprite.svg';
+      }
+
+      const assetId = this.emitFile(emitFileOptions);
+      const name = this.getFileName(assetId);
 
       const finalUrl =
         spriteUrlVersion && spriteUrlVersion.length > 0
-          ? `/${fileName}?v=${encodeURIComponent(spriteUrlVersion)}`
-          : `/${fileName}`;
+          ? `/${name}?v=${encodeURIComponent(spriteUrlVersion)}`
+          : `/${name}`;
 
       for (const [, item] of Object.entries(bundle)) {
         if (item.type === 'chunk' && typeof item.code === 'string') {
