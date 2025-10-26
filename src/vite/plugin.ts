@@ -1,4 +1,5 @@
 import type { Plugin } from 'vite';
+import { createHash } from 'node:crypto';
 import {
   PLACEHOLDER,
   createCollector,
@@ -7,11 +8,6 @@ import {
 } from '../core';
 
 export type ReactIconsSpriteVitePluginOptions = {
-  /**
-   * Append a cache-busting query parameter to the emitted sprite URL.
-   * Example: { spriteUrlVersion: "1.2.3" } -> "/assets/react-icons-sprite.svg?v=1.2.3"
-   */
-  spriteUrlVersion?: string;
   /**
    * If passed, this exact string will be used for the emitted file name.
    * If fileName is omitted, name will be generated as `react-icons-sprite-[hash].svg.
@@ -23,7 +19,7 @@ export type ReactIconsSpriteVitePluginOptions = {
 export const reactIconsSprite = (
   options: ReactIconsSpriteVitePluginOptions = {},
 ): Plugin => {
-  const { spriteUrlVersion, fileName } = options;
+  const { fileName } = options;
 
   const collector = createCollector();
 
@@ -71,6 +67,11 @@ export const reactIconsSprite = (
     async generateBundle(this, _options, bundle) {
       const spriteXml = await buildSprite(collector.toList());
 
+      const generatedHash = createHash('sha256')
+        .update(spriteXml)
+        .digest('hex')
+        .slice(0, 8);
+
       const emitFileOptions: Parameters<typeof this.emitFile>[0] = {
         type: 'asset',
         source: spriteXml,
@@ -85,10 +86,7 @@ export const reactIconsSprite = (
       const assetId = this.emitFile(emitFileOptions);
       const name = this.getFileName(assetId);
 
-      const finalUrl =
-        spriteUrlVersion && spriteUrlVersion.length > 0
-          ? `/${name}?v=${encodeURIComponent(spriteUrlVersion)}`
-          : `/${name}`;
+      const finalUrl = `/${name}?v=${encodeURIComponent(generatedHash)}`;
 
       for (const [, item] of Object.entries(bundle)) {
         if (item.type === 'chunk' && typeof item.code === 'string') {
