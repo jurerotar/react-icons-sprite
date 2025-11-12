@@ -1,8 +1,13 @@
-import { defineConfig } from 'tsdown';
+import { defineConfig, type UserConfig } from 'tsdown';
 
-export default defineConfig({
+const tsdownConfig: UserConfig = defineConfig({
   target: 'esnext',
-  entry: ['src/vite/plugin.ts', 'src/icon.tsx'],
+  entry: [
+    'src/vite/plugin.ts',
+    'src/webpack/plugin.ts',
+    'src/webpack/loader.ts',
+    'src/icon.tsx',
+  ],
   format: ['esm'],
   dts: true,
   clean: true,
@@ -13,5 +18,8 @@ export default defineConfig({
     '@babel/parser',
     '@babel/traverse',
     '@babel/types',
+    'webpack',
   ],
 });
+
+export default tsdownConfig;

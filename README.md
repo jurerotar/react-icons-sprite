@@ -1,9 +1,6 @@
 # react-icons-sprite
 
-`react-icons-sprite` is a lightweight plugin built on top of [react-icons](https://github.com/react-icons/react-icons). It automatically detects the `react-icons` components you use, generates a single SVG spritesheet containing them, and rewrites your code to reference those symbols via `<use>`. This approach both shrinks your bundle (no more inlined React components for every icon) and reduces runtime overhead, since React no longer has to reconcile large, nested SVG trees.
-
-> [!NOTE]
-> Only Vite is currently supported. If you'd like to see a Webpack or Turbopack implementation, please open an issue!
+`react-icons-sprite` is a lightweight plugin for Vite and Webpack, built on top of [react-icons](https://github.com/react-icons/react-icons). It automatically detects the `react-icons` components you use, generates a single SVG spritesheet containing them, and rewrites your code to reference those symbols via `<use>`. This approach both shrinks your bundle (no more inlined React components for every icon) and reduces runtime overhead, since React no longer has to reconcile large, nested SVG trees.
 
 ## Motivation
 
@@ -104,19 +101,54 @@ Install the plugin via npm or yarn:
 npm install --save-dev react-icons-sprite
 ```
 
-Only Vite is currently supported. You only need to add the plugin to the `plugins` array.
+### Vite
+Add the plugin to the `plugins` array in your Vite config.
 
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite';
 import { reactIconsSprite } from 'react-icons-sprite/vite';
 
-const viteConfig = defineConfig({
-  // ... rest of config
-  plugins: [
-    reactIconsSprite(),
-  ],
+export default defineConfig({
+  plugins: [reactIconsSprite()],
 });
+```
+
+### Webpack
+Add the loader to transform modules that import from `react-icons/*` and install the plugin to emit the sprite and rewrite the placeholder URL.
+
+```js
+// webpack.config.js (v5)
+const path = require('path');
+const { reactIconsSprite } = require('react-icons-sprite/webpack');
+
+module.exports = {
+  mode: 'production',
+  // ... your existing config
+  module: {
+    rules: [
+      {
+        test: /\.(mjs|cjs|js|jsx|ts|tsx)$/,
+        exclude: /node_modules/,
+        use: [
+          {
+            loader: require.resolve('react-icons-sprite/webpack/loader'),
+          },
+          // put your ts/tsx loader after ours (e.g. babel-loader or ts-loader)
+        ],
+      },
+    ],
+  },
+  plugins: [
+    reactIconsSprite({
+      // optional: fileName: 'icons.svg'
+    }),
+  ],
+  output: {
+    // ensure your publicPath is set correctly if you deploy under a sub-path
+    // publicPath: '/',
+  },
+};
 ```
 
 ## How it works
@@ -134,4 +166,3 @@ Contributions are welcome! Feel free to open an issue or submit a pull request.
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
-

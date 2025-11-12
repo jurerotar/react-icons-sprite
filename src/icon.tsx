@@ -1,10 +1,13 @@
-import type React from 'react';
+import type { SVGProps, JSX } from 'react';
 
-export type IconProps = React.SVGProps<SVGSVGElement> & {
+export type IconProps = SVGProps<SVGSVGElement> & {
   iconId: string;
 };
 
-export const ReactIconsSpriteIcon = ({ iconId, ...rest }: IconProps) => {
+export const ReactIconsSpriteIcon = ({
+  iconId,
+  ...rest
+}: IconProps): JSX.Element => {
   const spriteHref = '__SPRITE_URL_PLACEHOLDER__';
   const iconHref = `${spriteHref}#${iconId}`;
 

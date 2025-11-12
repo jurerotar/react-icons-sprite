@@ -1,16 +1,26 @@
 {
   "compilerOptions": {
+    "outDir": "dist",
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "declaration": true,
-    "outDir": "dist",
+    "baseUrl": "./",
+    "allowJs": false,
+    "jsx": "react-jsx",
     "skipLibCheck": true,
-    "jsx": "react-jsx"
+    "declaration": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "erasableSyntaxOnly": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "strictPropertyInitialization": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "strict": true
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src"]
 }

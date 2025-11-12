@@ -25,7 +25,7 @@ export type IconImport = {
   spec: t.ImportSpecifier;
 };
 
-export const parseAst = (code: string, filename = 'module.tsx'): t.File => {
+const parseAst = (code: string, filename = 'module.tsx'): t.File => {
   return parse(code, {
     sourceType: 'module',
     plugins: ['jsx', 'typescript'],
@@ -61,7 +61,7 @@ export const collectReactIconImports = (
   return map;
 };
 
-export const findExistingIconImport = (ast: t.File) => {
+const findExistingIconImport = (ast: t.File) => {
   let iconLocalName = ICON_COMPONENT_NAME;
   let hasIconImport = false;
 
@@ -91,7 +91,7 @@ export const findExistingIconImport = (ast: t.File) => {
   };
 };
 
-export const replaceJsxWithSprite = (
+const replaceJsxWithSprite = (
   ast: t.File,
   localNameToImport: Map<string, IconImport>,
   iconLocalName: string,
@@ -163,10 +163,10 @@ export const replaceJsxWithSprite = (
   };
 };
 
-export const insertIconImport = (
+const insertIconImport = (
   ast: t.File,
   iconLocalName: string = ICON_COMPONENT_NAME,
-) => {
+): void => {
   const firstImportIndex = ast.program.body.findIndex((n) =>
     t.isImportDeclaration(n),
   );
@@ -186,7 +186,7 @@ export const insertIconImport = (
   }
 };
 
-export const pruneUsedSpecifiers = (
+const pruneUsedSpecifiers = (
   ast: t.File,
   localNameToImport: Map<string, IconImport>,
   usedLocalNames: Set<string>,
@@ -204,13 +204,17 @@ export const pruneUsedSpecifiers = (
   );
 };
 
-export const generateCode = (ast: t.File, origCode: string, id: string) => {
+const generateCode = (ast: t.File, origCode: string, id: string) => {
   const { code, map } = generate(
     ast,
     { sourceMaps: true, sourceFileName: id },
     origCode,
   );
-  return { code, map };
+
+  return {
+    code,
+    map,
+  };
 };
 
 export const transformModule = (
@@ -311,16 +315,22 @@ export const buildSprite = async (
   return `<svg xmlns="http://www.w3.org/2000/svg"><defs>${symbols}</defs></svg>`;
 };
 
+type Pack = {
+  pack: string;
+  exportName: string;
+};
+
 export const createCollector = () => {
-  const set = new Map<string, { pack: string; exportName: string }>();
+  const set = new Map<string, Pack>();
+
   return {
-    add(pack: string, exportName: string) {
+    add(pack: string, exportName: string): void {
       set.set(`${pack}:${exportName}`, { pack, exportName });
     },
-    toList() {
+    toList(): Pack[] {
       return Array.from(set.values());
     },
-    clear() {
+    clear(): void {
       set.clear();
     },
   };
