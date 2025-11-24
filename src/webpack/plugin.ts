@@ -6,7 +6,7 @@ import type { Compiler, Compilation, WebpackPluginInstance } from 'webpack';
 export type ReactIconsSpriteWebpackPluginOptions = {
   /**
    * If passed, this exact string will be used for the emitted file name.
-   * If fileName is omitted, name will be generated as `react-icons-sprite.svg`.
+   * If fileName is omitted, name will be generated as `react-icons-sprite-[hash].svg`.
    * This is useful when, for example, multiple sprite sheets are generated during client and server builds.
    */
   fileName?: string;
@@ -43,7 +43,8 @@ export class ReactIconsSpriteWebpackPlugin implements WebpackPluginInstance {
               .digest('hex')
               .slice(0, 8);
 
-            const name = this.fileName ?? 'react-icons-sprite.svg';
+            const name =
+              this.fileName ?? `react-icons-sprite-${generatedHash}.svg`;
 
             const RawSource = compiler.webpack?.sources?.RawSource;
             if (!RawSource) {
@@ -68,7 +69,7 @@ export class ReactIconsSpriteWebpackPlugin implements WebpackPluginInstance {
             } else {
               base = '/';
             }
-            const finalUrl = `${base}${name}?v=${encodeURIComponent(generatedHash)}`;
+            const finalUrl = `${base}${name}`;
 
             // Replace placeholder in all JS chunks
             for (const asset of compilation.getAssets()) {

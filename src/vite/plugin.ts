@@ -72,21 +72,20 @@ export const reactIconsSprite = (
         .digest('hex')
         .slice(0, 8);
 
+      const fileNameToEmit = fileName
+        ? fileName
+        : `react-icons-sprite-${generatedHash}.svg`;
+
       const emitFileOptions: Parameters<typeof this.emitFile>[0] = {
         type: 'asset',
         source: spriteXml,
+        fileName: fileNameToEmit,
       };
-
-      if (fileName) {
-        emitFileOptions.fileName = fileName;
-      } else {
-        emitFileOptions.name = 'react-icons-sprite.svg';
-      }
 
       const assetId = this.emitFile(emitFileOptions);
       const name = this.getFileName(assetId);
 
-      const finalUrl = `/${name}?v=${encodeURIComponent(generatedHash)}`;
+      const finalUrl = `/${name}`;
 
       for (const [, item] of Object.entries(bundle)) {
         if (item.type === 'chunk' && typeof item.code === 'string') {
