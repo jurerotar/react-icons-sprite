@@ -13,7 +13,7 @@ describe('renderOneIcon', () => {
   it('preserves viewBox and presentation attributes on <symbol>', async () => {
     const { id, symbol } = await renderOneIcon('react-icons/bi', 'BiAlarm');
 
-    expect(id).toBe('ri-BiAlarm');
+    expect(id).toBe('ri-react-icons-bi-BiAlarm');
     // viewBox propagated
     expect(symbol).toMatch(/<symbol[^>]*viewBox="0 0 24 24"/i);
     // typical react-icons SVG includes fill/currentColor and stroke/currentColor; ensure kept

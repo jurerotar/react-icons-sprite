@@ -5,6 +5,7 @@ import {
   createCollector,
   transformModule,
   buildSprite,
+  DEFAULT_ICON_SOURCES,
 } from '../core';
 
 export type ReactIconsSpriteVitePluginOptions = {
@@ -38,18 +39,19 @@ export const reactIconsSprite = (
         return null;
       }
 
-      if (!/from\s+['"]react-icons\//.test(code)) {
-        return null;
-      }
-
       try {
         const {
           code: next,
           map,
           anyReplacements,
-        } = transformModule(code, id, (pack, exportName) => {
-          collector.add(pack, exportName);
-        });
+        } = transformModule(
+          code,
+          id,
+          (pack, exportName) => {
+            collector.add(pack, exportName);
+          },
+          DEFAULT_ICON_SOURCES,
+        );
         if (!anyReplacements) {
           return null;
         }

@@ -15,7 +15,7 @@ describe('transformModule - source maps', () => {
     expect(res.map!.sources?.[0]).toBe(id);
     // sanity: output contains our JSX replacement
     expect(res.code).toContain(
-      `<${ICON_COMPONENT_NAME} iconId="ri-BiAlarm" />`,
+      `<${ICON_COMPONENT_NAME} iconId="ri-react-icons-bi-BiAlarm" />`,
     );
   });
 });
