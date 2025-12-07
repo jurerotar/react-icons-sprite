@@ -11,9 +11,9 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./dist/icon.d.mts",
-      "import": "./dist/icon.mjs",
-      "default": "./dist/icon.mjs"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
     },
     "./vite": {
       "types": "./dist/vite/plugin.d.mts",

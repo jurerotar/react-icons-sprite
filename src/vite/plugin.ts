@@ -1,12 +1,12 @@
 import type { Plugin } from 'vite';
 import { createHash } from 'node:crypto';
 import {
-  PLACEHOLDER,
   createCollector,
   transformModule,
   buildSprite,
   DEFAULT_ICON_SOURCES,
 } from '../core';
+import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 
 export type ReactIconsSpriteVitePluginOptions = {
   /**
@@ -91,8 +91,8 @@ export const reactIconsSprite = (
 
       for (const [, item] of Object.entries(bundle)) {
         if (item.type === 'chunk' && typeof item.code === 'string') {
-          if (item.code.includes(PLACEHOLDER)) {
-            item.code = item.code.replaceAll(PLACEHOLDER, finalUrl);
+          if (item.code.includes(REACT_ICONS_SPRITE_URL_PLACEHOLDER)) {
+            item.code = item.code.replaceAll(REACT_ICONS_SPRITE_URL_PLACEHOLDER, finalUrl);
           }
         }
       }

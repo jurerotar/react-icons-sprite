@@ -76,18 +76,6 @@ const cases: Case[] = [
     exportName: 'DiReact',
     expectedId: 'ri-devicons-react-DiReact',
   },
-  {
-    title: 'typicons-react',
-    pack: 'typicons-react',
-    exportName: 'TiHome',
-    expectedId: 'ri-typicons-react-TiHome',
-  },
-  {
-    title: 'boxicons-react',
-    pack: 'boxicons-react',
-    exportName: 'BxAlarm',
-    expectedId: 'ri-boxicons-react-BxAlarm',
-  },
 ];
 
 describe('supported icon packages — transformModule integration', () => {

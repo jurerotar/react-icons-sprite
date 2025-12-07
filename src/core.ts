@@ -14,7 +14,6 @@ export const traverse =
 export const generate =
   (_generate as unknown as BabelGenerate).default ?? _generate;
 
-export const PLACEHOLDER = '__SPRITE_URL_PLACEHOLDER__';
 export const ICON_SOURCE = 'react-icons-sprite';
 export const ICON_COMPONENT_NAME = 'ReactIconsSpriteIcon';
 
@@ -27,13 +26,13 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
   /^@heroicons\/react(?:\/.*)?$/, // Heroicons v1/v2 subpaths
   /^@tabler\/icons-react$/, // Tabler
   /^phosphor-react$/, // Phosphor
+  /^@phosphor-icons\/react$/, // Phosphor
   /^react-feather$/, // Feather (react binding)
   /^react-bootstrap-icons$/, // Bootstrap Icons (react binding)
   /^grommet-icons$/, // Grommet
   /^remixicon-react$/, // Remix Icons React
+  /^@remixicon\/react$/, // Remix Icons React
   /^devicons-react$/, // Devicons React
-  /^typicons-react$/, // Typicons React
-  /^boxicons-react$/, // Boxicons React
 ];
 
 const sourceMatchesSupported = (

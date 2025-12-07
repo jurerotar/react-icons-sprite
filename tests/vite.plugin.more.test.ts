@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { reactIconsSprite } from '../src/vite/plugin';
-import { PLACEHOLDER } from '../src/core';
+import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../src';
 import type {
   PluginContext,
   TransformPluginContext,
@@ -78,8 +78,11 @@ describe('Vite plugin - generateBundle multi-chunk and collector lifecycle', () 
     } satisfies Pick<PluginContext, 'emitFile' | 'getFileName'>;
 
     const bundle: Record<string, { type: 'chunk'; code: string }> = {
-      'a.js': { type: 'chunk', code: `const s = '${PLACEHOLDER}';` },
-      'b.js': { type: 'chunk', code: `console.log("${PLACEHOLDER}")` },
+      'a.js': { type: 'chunk', code: `const s = '${REACT_ICONS_SPRITE_URL_PLACEHOLDER}';` },
+      'b.js': {
+        type: 'chunk',
+        code: `console.log("${REACT_ICONS_SPRITE_URL_PLACEHOLDER}")`,
+      },
       'c.js': { type: 'chunk', code: `console.log('no placeholder')` },
     };
 
@@ -121,7 +124,7 @@ describe('Vite plugin - generateBundle multi-chunk and collector lifecycle', () 
       },
     } satisfies Pick<PluginContext, 'emitFile' | 'getFileName'>;
     const bundle1: Record<string, { type: 'chunk'; code: string }> = {
-      'e.js': { type: 'chunk', code: `const u='${PLACEHOLDER}'` },
+      'e.js': { type: 'chunk', code: `const u='${REACT_ICONS_SPRITE_URL_PLACEHOLDER}'` },
     };
     const generateBundle1 = plugin.generateBundle as
       | GenerateBundleFn
@@ -147,7 +150,7 @@ describe('Vite plugin - generateBundle multi-chunk and collector lifecycle', () 
       },
     } satisfies Pick<PluginContext, 'emitFile' | 'getFileName'>;
     const bundle2: Record<string, { type: 'chunk'; code: string }> = {
-      'e.js': { type: 'chunk', code: `const u='${PLACEHOLDER}'` },
+      'e.js': { type: 'chunk', code: `const u='${REACT_ICONS_SPRITE_URL_PLACEHOLDER}'` },
     };
     const generateBundle2 = plugin.generateBundle as
       | GenerateBundleFn

@@ -2,6 +2,24 @@
 
 `react-icons-sprite` is a lightweight plugin for Vite and Webpack that turns React icon components into a single SVG spritesheet and rewrites your code to reference those symbols via `<use>`. It supports multiple React icon packages that export icons as individual React components. This approach both shrinks your bundle (no more inlined React components for every icon) and reduces runtime overhead, since React no longer has to reconcile large, nested SVG trees.
 
+## Supported icon libraries (quick list)
+
+Out of the box, imports from the following libraries are detected and transformed:
+
+- `react-icons/*` packs (e.g. `react-icons/bi`, `react-icons/fa`, ...)
+- `lucide-react`
+- `@radix-ui/react-icons`
+- `@heroicons/react` (v1 and v2 subpaths)
+- `@tabler/icons-react`
+- `phosphor-react`
+- `@phosphor-icons/react`
+- `react-feather`
+- `react-bootstrap-icons`
+- `grommet-icons`
+- `remixicon-react`
+- `@remixicon/react`
+- `devicons-react`
+
 ## Motivation
 
 By default, when you use an icon library like `react-icons`, each icon is a React component. For example:
@@ -154,26 +172,6 @@ In **development mode**, the plugin does nothing special. Icons are rendered as 
 In **build mode**, the plugin transforms your code. It parses each module, looks for imports from supported React icon packages, and rewrites the JSX. Instead of rendering full inline `<svg>` trees, it replaces them with `<ReactIconsSpriteIcon iconId="..." />`. While doing this, it collects every unique icon used across the project. After the bundling step, the plugin renders all those icons once to static markup and generates a single SVG file containing `<symbol>` definitions for each one. Finally, it rewrites your bundle to point every `<ReactIconsSpriteIcon>` at that spritesheet using a `<use>` tag.
 
 The result: during development you keep fast feedback loops, and in production you ship a single optimized sprite file with lightweight `<use>` references.
-
-## Supported icon packages and symbol IDs
-
-This plugin supports icon packages that export icons as individual React components. Out of the box, it detects imports from:
-
-- `react-icons/*` packs (e.g. `react-icons/bi`, `react-icons/fa`, ...)
-- `lucide-react`
-- `@radix-ui/react-icons`
-- `@heroicons/react` (v1 and v2 subpaths)
-- `@tabler/icons-react`
-- `phosphor-react`
-- `react-feather`
-- `react-bootstrap-icons`
-- `grommet-icons`
-- `remixicon-react`
-- `devicons-react`
-- `typicons-react`
-- `boxicons-react`
-
-If you need support for another React icon package that exposes individual React components, please open an issue or PR.
 
 ### What is intentionally not supported
 
