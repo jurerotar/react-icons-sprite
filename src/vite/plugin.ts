@@ -92,7 +92,10 @@ export const reactIconsSprite = (
       for (const [, item] of Object.entries(bundle)) {
         if (item.type === 'chunk' && typeof item.code === 'string') {
           if (item.code.includes(REACT_ICONS_SPRITE_URL_PLACEHOLDER)) {
-            item.code = item.code.replaceAll(REACT_ICONS_SPRITE_URL_PLACEHOLDER, finalUrl);
+            item.code = item.code.replaceAll(
+              REACT_ICONS_SPRITE_URL_PLACEHOLDER,
+              finalUrl,
+            );
           }
         }
       }

@@ -86,7 +86,10 @@ export class ReactIconsSpriteWebpackPlugin implements WebpackPluginInstance {
                 continue;
               }
 
-              const next = src.replaceAll(REACT_ICONS_SPRITE_URL_PLACEHOLDER, finalUrl);
+              const next = src.replaceAll(
+                REACT_ICONS_SPRITE_URL_PLACEHOLDER,
+                finalUrl,
+              );
               compilation.updateAsset(filename, new RawSource(next));
             }
           },
