@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { PLACEHOLDER, buildSprite } from '../core';
+import { buildSprite } from '../core';
+import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 import { collector } from '../collector';
 import type { Compiler, Compilation, WebpackPluginInstance } from 'webpack';
 
@@ -81,11 +82,14 @@ export class ReactIconsSpriteWebpackPlugin implements WebpackPluginInstance {
               if (typeof src !== 'string') {
                 continue;
               }
-              if (!src.includes(PLACEHOLDER)) {
+              if (!src.includes(REACT_ICONS_SPRITE_URL_PLACEHOLDER)) {
                 continue;
               }
 
-              const next = src.replaceAll(PLACEHOLDER, finalUrl);
+              const next = src.replaceAll(
+                REACT_ICONS_SPRITE_URL_PLACEHOLDER,
+                finalUrl,
+              );
               compilation.updateAsset(filename, new RawSource(next));
             }
           },

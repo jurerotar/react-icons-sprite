@@ -1,10 +1,30 @@
 # react-icons-sprite
 
-`react-icons-sprite` is a lightweight plugin for Vite and Webpack, built on top of [react-icons](https://github.com/react-icons/react-icons). It automatically detects the `react-icons` components you use, generates a single SVG spritesheet containing them, and rewrites your code to reference those symbols via `<use>`. This approach both shrinks your bundle (no more inlined React components for every icon) and reduces runtime overhead, since React no longer has to reconcile large, nested SVG trees.
+`react-icons-sprite` is a lightweight plugin for Vite and Webpack that turns React icon components into a single SVG spritesheet and rewrites your code to reference those symbols via `<use>`.
+
+It supports multiple React icon packages that export icons as individual React components. This approach both shrinks your bundle (no more inlined React components for every icon) and reduces runtime overhead, since React no longer has to reconcile large, nested SVG trees.
+
+## Supported icon libraries
+
+Out of the box, imports from the following libraries are detected and transformed:
+
+- `react-icons/*` packs (e.g. `react-icons/bi`, `react-icons/fa`, ...)
+- `lucide-react`
+- `@radix-ui/react-icons`
+- `@heroicons/react` (v1 and v2 subpaths)
+- `@tabler/icons-react`
+- `phosphor-react`
+- `@phosphor-icons/react`
+- `react-feather`
+- `react-bootstrap-icons`
+- `grommet-icons`
+- `remixicon-react`
+- `@remixicon/react`
+- `devicons-react`
 
 ## Motivation
 
-By default, when you use `react-icons`, each icon is a React component. For example:
+By default, when you use an icon library like `react-icons`, each icon is a React component. For example:
 
 ```tsx
 import { LuWheat } from "react-icons/lu";
@@ -64,7 +84,7 @@ export function Example() {
 import { b as n } from './icon-FONPSuqX.js';
 
 var r = e(t());
-const i = () => (0, r.jsx)(n, { iconId: `ri-LuWheat` });
+const i = () => (0, r.jsx)(n, { iconId: `ri-react-icons-lu-LuWheat` });
 export { i as IconWheat };
 ```
 
@@ -93,6 +113,26 @@ Runtime difference:
 
 This is a big win when you’re rendering icons in lists, tables, or maps where dozens or hundreds of them appear at once.
 
+### Performance comparison
+
+| icon (pack)        | react-icons icon render mean time |     react-icons-sprite icon render mean time | Relative difference     |
+|--------------------|----------------------------------:|---------------------------------------------:|------------------------:|
+| **FiCpu** (fi)     |                          0.188 ms |                                        0.048 ms | 74.6% reduction         |
+| **MdBuild** (md)   |                          0.198 ms |                                        0.048 ms | 76.0% reduction         |
+| **FaCamera** (fa)  |                             0.162 ms |                                        0.015 ms | 90.7% reduction         |
+| **IoAperture** (io5)|                             0.029 ms |                                        0.015 ms | 49.7% reduction         |
+| **BiBell** (bi)    |                             0.023 ms |                                        0.014 ms | 38.5% reduction         |
+| **AiOutlineAlert** (ai) |                             0.023 ms |                                        0.014 ms | 38.3% reduction         |
+| **BsAlarm** (bs)   |                             0.027 ms |                                        0.014 ms | 47.4% reduction         |
+| **RiAnchor** (ri)  |                             0.023 ms |                                        0.014 ms | 38.6% reduction         |
+| **CgArrows** (cg)  |                             0.029 ms |                                        0.014 ms | 52.0% reduction         |
+| **HiAcademicCap** (hi) |                             0.023 ms |                                        0.014 ms | 38.6% reduction         |
+| **SiTypescript** (si) |                             0.023 ms |                                        0.014 ms | 39.7% reduction         |
+| **TiThLarge** (ti) |                             0.023 ms |                                        0.014 ms | 40.0% reduction         |
+
+* **Test details / machine:** **Lenovo Legion 5 Pro 16ACH6H** (Ryzen 7 5800H — 8 cores / 16 threads, base ≈ 3.2 GHz, turbo ≈ 4.4 GHz, DDR4-3200 memory); Node.js v24.10.0.
+* Differences will vary based on icons used in your application, but they will generally be the range of 50-75% reduction in render time. Larger icons will generate a larger difference.
+
 ## Installation
 
 Install the plugin via npm or yarn:
@@ -115,7 +155,7 @@ export default defineConfig({
 ```
 
 ### Webpack
-Add the loader to transform modules that import from `react-icons/*` and install the plugin to emit the sprite and rewrite the placeholder URL.
+Add the loader to transform modules that import icons and install the plugin to emit the sprite and rewrite the placeholder URL.
 
 ```js
 // webpack.config.js (v5)
@@ -144,18 +184,14 @@ module.exports = {
       // optional: fileName: 'icons.svg'
     }),
   ],
-  output: {
-    // ensure your publicPath is set correctly if you deploy under a sub-path
-    // publicPath: '/',
-  },
 };
 ```
 
 ## How it works
 
-In **development mode**, the plugin does nothing special. Icons are rendered as they normally would from `react-icons`. This keeps hot module replacement (HMR) snappy — there’s no extra parsing of the codebase or regenerating of the sprite on every save. If the plugin were to build the sprite during dev, it would need to constantly scan for `react-icons` imports and rebuild the sheet, which is expensive and slows down iteration. So, in dev, you get the normal `react-icons` behavior.
+In **development mode**, the plugin does nothing special. Icons are rendered as they normally would from your icon library. This keeps hot module replacement (HMR) snappy — there’s no extra parsing of the codebase or regenerating of the sprite on every save. If the plugin were to build the sprite during dev, it would need to constantly scan for icon imports and rebuild the sheet, which is expensive and slows down iteration. So, in dev, you get the normal component behavior.
 
-In **build mode**, the plugin transforms your code. It parses each module, looks for imports from `react-icons/*`, and rewrites the JSX. Instead of rendering full inline `<svg>` trees, it replaces them with `<ReactIconsSpriteIcon iconId="..." />`. While doing this, it collects every unique icon used across the project. After the bundling step, the plugin renders all those icons once to static markup and generates a single SVG file containing `<symbol>` definitions for each one. Finally, it rewrites your bundle to point every `<ReactIconsSpriteIcon>` at that spritesheet using a `<use>` tag.
+In **build mode**, the plugin transforms your code. It parses each module, looks for imports from supported React icon packages, and rewrites the JSX. Instead of rendering full inline `<svg>` trees, it replaces them with `<ReactIconsSpriteIcon iconId="..." />`. While doing this, it collects every unique icon used across the project. After the bundling step, the plugin renders all those icons once to static markup and generates a single SVG file containing `<symbol>` definitions for each one. Finally, it rewrites your bundle to point every `<ReactIconsSpriteIcon>` at that spritesheet using a `<use>` tag.
 
 The result: during development you keep fast feedback loops, and in production you ship a single optimized sprite file with lightweight `<use>` references.
 

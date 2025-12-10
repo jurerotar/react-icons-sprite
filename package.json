@@ -1,6 +1,6 @@
 {
   "name": "react-icons-sprite",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "type": "module",
   "license": "MIT",
   "description": "",
@@ -11,9 +11,9 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./dist/icon.d.mts",
-      "import": "./dist/icon.mjs",
-      "default": "./dist/icon.mjs"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
     },
     "./vite": {
       "types": "./dist/vite/plugin.d.mts",
@@ -69,15 +69,15 @@
     "@biomejs/biome": "2.3.8",
     "@types/babel__generator": "7.27.0",
     "@types/babel__traverse": "7.28.0",
-    "@types/node": "24.10.1",
+    "@types/node": "24.10.2",
     "@types/react-dom": "19.2.3",
-    "@typescript/native-preview": "7.0.0-dev.20251205.1",
+    "@typescript/native-preview": "7.0.0-dev.20251210.1",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "react-icons": "5.5.0",
-    "tsdown": "0.17.0",
+    "tsdown": "0.17.2",
     "typescript": "5.9.3",
-    "vite": "7.2.6",
+    "vite": "7.2.7",
     "vitest": "4.0.15",
     "webpack": "5.103.0"
   },

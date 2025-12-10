@@ -11,8 +11,8 @@ describe('buildSprite - spritesheet generation', () => {
     expect(sprite).toMatch(/<svg[^>]*xmlns="http:\/\/www.w3.org\/2000\/svg"/);
     expect(sprite).toContain('<defs>');
     expect(sprite).toContain('</defs>');
-    expect(sprite).toContain('id="ri-BiAlarm"');
-    expect(sprite).toContain('id="ri-BiAdjust"');
+    expect(sprite).toContain('id="ri-react-icons-bi-BiAlarm"');
+    expect(sprite).toContain('id="ri-react-icons-bi-BiAdjust"');
     expect(sprite.trim().endsWith('</svg>')).toBe(true);
   });
 });

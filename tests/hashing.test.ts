@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { reactIconsSprite } from '../src/vite/plugin';
-import { PLACEHOLDER } from '../src/core';
+import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../src';
 import { createHash } from 'node:crypto';
 import type {
   PluginContext,
@@ -40,7 +40,7 @@ describe('vite plugin hashing and URL replacement', () => {
       },
     } satisfies Pick<PluginContext, 'emitFile' | 'getFileName'>;
 
-    const chunkCode = `const a = '${PLACEHOLDER}'; const b = "${PLACEHOLDER}";`;
+    const chunkCode = `const a = '${REACT_ICONS_SPRITE_URL_PLACEHOLDER}'; const b = "${REACT_ICONS_SPRITE_URL_PLACEHOLDER}";`;
     const bundle: Record<string, { type: 'chunk'; code: string }> = {
       'entry.js': { type: 'chunk', code: chunkCode },
     };
@@ -89,7 +89,10 @@ describe('vite plugin hashing and URL replacement', () => {
     } satisfies Pick<PluginContext, 'emitFile' | 'getFileName'>;
 
     const bundle: Record<string, { type: 'chunk'; code: string }> = {
-      'entry.js': { type: 'chunk', code: `console.log('${PLACEHOLDER}')` },
+      'entry.js': {
+        type: 'chunk',
+        code: `console.log('${REACT_ICONS_SPRITE_URL_PLACEHOLDER}')`,
+      },
     };
 
     const generateBundle2 = plugin.generateBundle as

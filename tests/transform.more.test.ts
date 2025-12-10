@@ -21,8 +21,8 @@ describe('transformModule - edge cases', () => {
     const res = transformModule(code, id, () => {});
 
     // Uses alias in JSX
-    expect(res.code).toContain('<RIS iconId="ri-BiAlarm" />');
-    expect(res.code).toContain('<RIS iconId="ri-BiAdjust" />');
+    expect(res.code).toContain('<RIS iconId="ri-react-icons-bi-BiAlarm" />');
+    expect(res.code).toContain('<RIS iconId="ri-react-icons-bi-BiAdjust" />');
 
     // No new import for the component should be added
     const importCount = (
@@ -49,7 +49,9 @@ describe('transformModule - edge cases', () => {
     // Should not leave original closing tag name lying around
     expect(res.code).not.toMatch(/<\/BiAlarm>/);
     // Opening tag replaced
-    expect(res.code).toContain(`<${ICON_COMPONENT_NAME} iconId="ri-BiAlarm">`);
+    expect(res.code).toContain(
+      `<${ICON_COMPONENT_NAME} iconId="ri-react-icons-bi-BiAlarm">`,
+    );
     // Closing tag is the icon component
     expect(res.code).toContain(`</${ICON_COMPONENT_NAME}>`);
   });

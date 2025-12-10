@@ -14,9 +14,42 @@ export const traverse =
 export const generate =
   (_generate as unknown as BabelGenerate).default ?? _generate;
 
-export const PLACEHOLDER = '__SPRITE_URL_PLACEHOLDER__';
 export const ICON_SOURCE = 'react-icons-sprite';
 export const ICON_COMPONENT_NAME = 'ReactIconsSpriteIcon';
+
+// Built-in supported React icon package sources (exact or regex patterns)
+// Only packages exporting individual React components are listed.
+export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
+  /^react-icons\/[\w-]+$/, // react-icons packs
+  /^lucide-react$/, // Lucide
+  /^@radix-ui\/react-icons$/, // Radix Icons
+  /^@heroicons\/react(?:\/.*)?$/, // Heroicons v1/v2 subpaths
+  /^@tabler\/icons-react$/, // Tabler
+  /^phosphor-react$/, // Phosphor
+  /^@phosphor-icons\/react$/, // Phosphor
+  /^react-feather$/, // Feather (react binding)
+  /^react-bootstrap-icons$/, // Bootstrap Icons (react binding)
+  /^grommet-icons$/, // Grommet
+  /^remixicon-react$/, // Remix Icons React
+  /^@remixicon\/react$/, // Remix Icons React
+  /^devicons-react$/, // Devicons React
+];
+
+const sourceMatchesSupported = (
+  source: string,
+  sources = DEFAULT_ICON_SOURCES,
+) => sources.some((re) => re.test(source));
+
+const normalizeAlias = (pack: string): string => {
+  // Remove leading @, replace non-alphanumeric chars with '-'
+  const withoutScope = pack.replace(/^@/, '');
+  return withoutScope.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+};
+
+export const computeIconId = (pack: string, exportName: string): string => {
+  const alias = normalizeAlias(pack);
+  return `ri-${alias}-${exportName}`;
+};
 
 export type IconImport = {
   pack: string;
@@ -33,14 +66,15 @@ const parseAst = (code: string, filename = 'module.tsx'): t.File => {
   });
 };
 
-export const collectReactIconImports = (
+export const collectIconImports = (
   ast: t.File,
+  sources: ReadonlyArray<RegExp> = DEFAULT_ICON_SOURCES,
 ): Map<string, IconImport> => {
   const map = new Map<string, IconImport>();
   for (const node of ast.program.body) {
     if (
       t.isImportDeclaration(node) &&
-      /^react-icons\/[\w-]+$/.test(node.source.value) &&
+      sourceMatchesSupported(node.source.value, sources) &&
       node.importKind !== 'type'
     ) {
       const pack = node.source.value;
@@ -129,11 +163,9 @@ const replaceJsxWithSprite = (
           t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: 'iconId' }),
       );
       if (!hasIconId) {
+        const idValue = computeIconId(meta.pack, meta.exportName);
         path.node.attributes.unshift(
-          t.jSXAttribute(
-            t.jSXIdentifier('iconId'),
-            t.stringLiteral(`ri-${meta.exportName}`),
-          ),
+          t.jSXAttribute(t.jSXIdentifier('iconId'), t.stringLiteral(idValue)),
         );
       }
 
@@ -221,9 +253,10 @@ export const transformModule = (
   code: string,
   id: string,
   register: (pack: string, exportName: string) => void,
+  sources: ReadonlyArray<RegExp> = DEFAULT_ICON_SOURCES,
 ): GeneratorResult & { anyReplacements: boolean } => {
   const ast = parseAst(code, id);
-  const localNameToImport = collectReactIconImports(ast);
+  const localNameToImport = collectIconImports(ast, sources);
   if (localNameToImport.size === 0) {
     return { code, map: null, anyReplacements: false };
   }
@@ -279,7 +312,7 @@ export const renderOneIcon = async (pack: string, exportName: string) => {
     throw new Error(`Icon export not found: ${pack} -> ${exportName}`);
   }
 
-  const id = `ri-${exportName}`;
+  const id = computeIconId(pack, exportName);
   const html = renderToStaticMarkup(createElement(Comp));
 
   const viewBox = html.match(/viewBox="([^"]+)"/i)?.[1] ?? '0 0 24 24';

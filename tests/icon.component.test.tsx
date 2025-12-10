@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ReactIconsSpriteIcon } from '../src/icon';
-import { PLACEHOLDER } from '../src/core';
+import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../src';
 
 describe('ReactIconsSpriteIcon component', () => {
   it('renders svg with default attributes and composed href', () => {
@@ -24,7 +24,7 @@ describe('ReactIconsSpriteIcon component', () => {
     expect(html).toContain('aria-label="bell"');
 
     // href composed from placeholder + # + iconId
-    const expectedHref = `${PLACEHOLDER}#ri-BiAlarm`;
+    const expectedHref = `${REACT_ICONS_SPRITE_URL_PLACEHOLDER}#ri-BiAlarm`;
     expect(html).toContain(`<use href="${expectedHref}"></use>`);
   });
 

@@ -38,10 +38,10 @@ describe('transformModule - import parsing and JSX replacement', () => {
 
     // JSX tags replaced to the icon component name
     expect(res.code).toContain(
-      `<${ICON_COMPONENT_NAME} iconId="ri-BiAlarm" />`,
+      `<${ICON_COMPONENT_NAME} iconId="ri-react-icons-bi-BiAlarm" />`,
     );
     expect(res.code).toContain(
-      `<${ICON_COMPONENT_NAME} iconId="ri-BiAdjust" className="x" />`,
+      `<${ICON_COMPONENT_NAME} iconId="ri-react-icons-bi-BiAdjust" className="x" />`,
     );
 
     // Original BiAlarm/BiAdjust specifiers should be pruned if unused after replacement
