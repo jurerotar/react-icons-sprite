@@ -1,6 +1,6 @@
-import React, { type ComponentType } from 'react';
+import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { performance } from 'perf_hooks';
+import { performance } from 'node:perf_hooks';
 import type { IconType } from 'react-icons';
 import { FiActivity } from 'react-icons/fi';
 import { MdAccessibility } from 'react-icons/md';
@@ -58,7 +58,7 @@ const computeSymbolId = (pack: string, exportName: string) => {
   return `sprite-${p}-${n}`;
 };
 
-const renderComponentToString = (Comp: ComponentType<any>, size = ICON_SIZE) => {
+const renderComponentToString = (Comp: IconType, size = ICON_SIZE) => {
   return renderToStaticMarkup(React.createElement('div', null,
     React.createElement(Comp, { size, width: size, height: size, color: 'currentColor' })
   ));
@@ -76,7 +76,7 @@ const renderUseOnly = (id: string, count = 1, size = ICON_SIZE) => {
 /** reduction relative to native baseline, clamped to [-100, 100] */
 const reductionPercentClamped = (nativeVal: number, spriteVal: number) => {
   if (!Number.isFinite(nativeVal) || !Number.isFinite(spriteVal) || nativeVal === 0) {
-    return NaN;
+    return Number.NaN;
   }
   const raw = ((nativeVal - spriteVal) / nativeVal) * 100; // positive => sprite faster
   return Math.max(-100, Math.min(100, raw));
@@ -119,6 +119,7 @@ const runBenchmark = async () => {
     });
   }
 
+  // biome-ignore lint/suspicious/noConsole: This is fine
   console.table(rows);
 };
 
