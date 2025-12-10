@@ -23,17 +23,45 @@ const ICON_SIZE = 64;
 
 const LOADED_PACKS: LoadedPack[] = [
   { pack: 'react-icons/fi', iconComp: FiActivity, exportName: 'FiActivity' },
-  { pack: 'react-icons/md', iconComp: MdAccessibility, exportName: 'MdAccessibility' },
+  {
+    pack: 'react-icons/md',
+    iconComp: MdAccessibility,
+    exportName: 'MdAccessibility',
+  },
   { pack: 'react-icons/fa', iconComp: FaBeer, exportName: 'FaBeer' },
-  { pack: 'react-icons/io5', iconComp: IoAccessibility, exportName: 'IoAccessibility' },
+  {
+    pack: 'react-icons/io5',
+    iconComp: IoAccessibility,
+    exportName: 'IoAccessibility',
+  },
   { pack: 'react-icons/bi', iconComp: BiBell, exportName: 'BiBell' },
-  { pack: 'react-icons/ai', iconComp: AiOutlineAlert, exportName: 'AiOutlineAlert' },
+  {
+    pack: 'react-icons/ai',
+    iconComp: AiOutlineAlert,
+    exportName: 'AiOutlineAlert',
+  },
   { pack: 'react-icons/bs', iconComp: BsAlarm, exportName: 'BsAlarm' },
-  { pack: 'react-icons/ri', iconComp: RiAiGenerate2, exportName: 'RiAiGenerate2' },
+  {
+    pack: 'react-icons/ri',
+    iconComp: RiAiGenerate2,
+    exportName: 'RiAiGenerate2',
+  },
   { pack: 'react-icons/cg', iconComp: CgAbstract, exportName: 'CgAbstract' },
-  { pack: 'react-icons/hi', iconComp: HiAcademicCap, exportName: 'HiAcademicCap' },
-  { pack: 'react-icons/si', iconComp: SiTypescript, exportName: 'SiTypescript' },
-  { pack: 'react-icons/ti', iconComp: TiAdjustBrightness, exportName: 'TiAdjustBrightness' },
+  {
+    pack: 'react-icons/hi',
+    iconComp: HiAcademicCap,
+    exportName: 'HiAcademicCap',
+  },
+  {
+    pack: 'react-icons/si',
+    iconComp: SiTypescript,
+    exportName: 'SiTypescript',
+  },
+  {
+    pack: 'react-icons/ti',
+    iconComp: TiAdjustBrightness,
+    exportName: 'TiAdjustBrightness',
+  },
 ];
 
 const median = (nums: number[]) => {
@@ -53,29 +81,53 @@ const perIterationTimes = (fn: () => void, iters = RERENDER_ITERS) => {
 };
 
 const computeSymbolId = (pack: string, exportName: string) => {
-  const p = pack.replace(/^@/, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+  const p = pack
+    .replace(/^@/, '')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
   const n = exportName.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
   return `sprite-${p}-${n}`;
 };
 
 const renderComponentToString = (Comp: IconType, size = ICON_SIZE) => {
-  return renderToStaticMarkup(React.createElement('div', null,
-    React.createElement(Comp, { size, width: size, height: size, color: 'currentColor' })
-  ));
+  return renderToStaticMarkup(
+    React.createElement(
+      'div',
+      null,
+      React.createElement(Comp, {
+        size,
+        width: size,
+        height: size,
+        color: 'currentColor',
+      }),
+    ),
+  );
 };
 
 const renderUseOnly = (id: string, count = 1, size = ICON_SIZE) => {
   const children = Array.from({ length: count }, (_, i) =>
-    React.createElement('svg', { key: i, width: size, height: size, preserveAspectRatio: 'xMidYMid meet', style: { color: 'currentColor' } },
-      React.createElement('use', { href: `#${id}` })
-    )
+    React.createElement(
+      'svg',
+      {
+        key: i,
+        width: size,
+        height: size,
+        preserveAspectRatio: 'xMidYMid meet',
+        style: { color: 'currentColor' },
+      },
+      React.createElement('use', { href: `#${id}` }),
+    ),
   );
   return renderToStaticMarkup(React.createElement('div', null, ...children));
 };
 
 /** reduction relative to native baseline, clamped to [-100, 100] */
 const reductionPercentClamped = (nativeVal: number, spriteVal: number) => {
-  if (!Number.isFinite(nativeVal) || !Number.isFinite(spriteVal) || nativeVal === 0) {
+  if (
+    !Number.isFinite(nativeVal) ||
+    !Number.isFinite(spriteVal) ||
+    nativeVal === 0
+  ) {
     return Number.NaN;
   }
   const raw = ((nativeVal - spriteVal) / nativeVal) * 100; // positive => sprite faster
@@ -90,7 +142,9 @@ const formatReductionLabel = (pct: number) => {
   if (!Number.isFinite(pct)) {
     return '–';
   }
-  return pct >= 0 ? `${pct.toFixed(1)}% reduction` : `${Math.abs(pct).toFixed(1)}% slower`;
+  return pct >= 0
+    ? `${pct.toFixed(1)}% reduction`
+    : `${Math.abs(pct).toFixed(1)}% slower`;
 };
 
 const runBenchmark = async () => {
@@ -105,7 +159,9 @@ const runBenchmark = async () => {
       renderUseOnly(id);
     }
 
-    const nativeTimes = perIterationTimes(() => renderComponentToString(iconComp));
+    const nativeTimes = perIterationTimes(() =>
+      renderComponentToString(iconComp),
+    );
     const spriteTimes = perIterationTimes(() => renderUseOnly(id));
     const nativeMedian = median(nativeTimes);
     const spriteMedian = median(spriteTimes);
