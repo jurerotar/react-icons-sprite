@@ -76,6 +76,24 @@ const cases: Case[] = [
     exportName: 'DiReact',
     expectedId: 'ri-devicons-react-DiReact',
   },
+  {
+    title: 'fontawesome-svg-icons',
+    pack: '@fortawesome/free-solid-svg-icons',
+    exportName: 'faCoffee',
+    expectedId: 'ri-fortawesome-free-solid-svg-icons-faCoffee',
+  },
+  {
+    title: 'MUI Icons',
+    pack: '@mui/icons-material',
+    exportName: 'Alarm',
+    expectedId: 'ri-mui-icons-material-Alarm',
+  },
+  {
+    title: 'Unicons',
+    pack: '@iconscout/react-unicons',
+    exportName: 'UilReact',
+    expectedId: 'ri-iconscout-react-unicons-UilReact',
+  },
 ];
 
 describe('supported icon packages — transformModule integration', () => {

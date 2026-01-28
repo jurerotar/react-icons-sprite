@@ -21,6 +21,10 @@ Out of the box, imports from the following libraries are detected and transforme
 - `remixicon-react`
 - `@remixicon/react`
 - `devicons-react`
+- `@fortawesome/free-solid-svg-icons` (and other Font Awesome icon packs)
+- `@fortawesome/react-fontawesome`
+- `@mui/icons-material`
+- `@iconscout/react-unicons`
 
 ## Motivation
 
