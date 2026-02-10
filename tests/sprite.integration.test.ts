@@ -87,60 +87,33 @@ describe('Sprite integration across icon sets', () => {
       `generates valid sprite content for ${icon.title} (${icon.pack})`,
       { timeout: 30000 },
       async () => {
-        try {
-          const sprite = await buildSprite([
-            { pack: icon.pack, exportName: icon.exportName },
-          ]);
+        const sprite = await buildSprite([
+          { pack: icon.pack, exportName: icon.exportName },
+        ]);
 
-          if (
-            sprite ===
-            '<svg xmlns="http://www.w3.org/2000/svg"><defs></defs></svg>'
-          ) {
-            console.warn(
-              `Skipping ${icon.title} test: renderOneIcon returned empty symbol, likely import failed silently.`,
-            );
-            return;
-          }
+        expect(sprite).toMatch(
+          /<svg[^>]*xmlns="http:\/\/www.w3.org\/2000\/svg"/,
+        );
+        expect(sprite).toContain('<defs>');
+        expect(sprite).toContain('</defs>');
+        expect(sprite.trim().endsWith('</svg>')).toBe(true);
 
-          // 1. Verify it's a valid SVG
-          expect(sprite).toMatch(
-            /<svg[^>]*xmlns="http:\/\/www.w3.org\/2000\/svg"/,
-          );
-          expect(sprite).toContain('<defs>');
-          expect(sprite).toContain('</defs>');
-          expect(sprite.trim().endsWith('</svg>')).toBe(true);
+        // 2. Verify it contains the symbol with correct ID
+        // Note: computeIconId is internal, but we know the format or can just check for inclusion
+        // The ID should be ri-<normalized-pack>-<exportName>
+        const expectedIdPart = icon.exportName;
+        expect(sprite).toContain(`id="ri-`);
+        expect(sprite).toContain(expectedIdPart);
 
-          // 2. Verify it contains the symbol with correct ID
-          // Note: computeIconId is internal but we know the format or can just check for inclusion
-          // The ID should be ri-<normalized-pack>-<exportName>
-          const expectedIdPart = icon.exportName;
-          expect(sprite).toContain(`id="ri-`);
-          expect(sprite).toContain(expectedIdPart);
+        // 3. Verify it contains actual path/graphic definition
+        // Most icons use <path ... />, <g ... />, <circle ... />, etc.
+        // We expect at least one of these inside the symbol.
+        expect(sprite).toMatch(
+          /<(path|g|circle|rect|polyline|polygon|ellipse)/i,
+        );
 
-          // 3. Verify it contains actual path/graphic definition
-          // Most icons use <path ... />, <g ... />, <circle ... />, etc.
-          // We expect at least one of these inside the symbol.
-          expect(sprite).toMatch(
-            /<(path|g|circle|rect|polyline|polygon|ellipse)/i,
-          );
-
-          // 4. Verify viewBox is present
-          expect(sprite).toContain('viewBox=');
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          // If the package is not installed or failed to resolve, we skip the test instead of failing
-          if (
-            msg.includes('Cannot find module') ||
-            msg.includes('Failed to resolve entry for package') ||
-            msg.includes('Cannot find package')
-          ) {
-            console.warn(
-              `Skipping ${icon.title} test: package ${icon.pack} not available or failed to resolve.`,
-            );
-            return;
-          }
-          throw err;
-        }
+        // 4. Verify viewBox is present
+        expect(sprite).toContain('viewBox=');
       },
     );
   }

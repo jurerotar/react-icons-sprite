@@ -193,7 +193,7 @@ describe('FontAwesome and MUI Integration', () => {
       export const C = () => <MyIcon />;
     `;
 
-    const customSources = [/^\my-custom-icons$/];
+    const customSources = [/^my-custom-icons$/];
     const seen: Array<[string, string]> = [];
     const res = transformModule(
       code,
