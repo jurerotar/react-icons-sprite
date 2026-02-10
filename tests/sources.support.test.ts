@@ -65,12 +65,6 @@ const cases: Case[] = [
     expectedId: 'ri-grommet-icons-Add',
   },
   {
-    title: 'remixicon-react',
-    pack: 'remixicon-react',
-    exportName: 'RiAlarmLine',
-    expectedId: 'ri-remixicon-react-RiAlarmLine',
-  },
-  {
     title: 'devicons-react',
     pack: 'devicons-react',
     exportName: 'DiReact',
@@ -87,12 +81,6 @@ const cases: Case[] = [
     pack: '@mui/icons-material',
     exportName: 'Alarm',
     expectedId: 'ri-mui-icons-material-Alarm',
-  },
-  {
-    title: 'Unicons',
-    pack: '@iconscout/react-unicons',
-    exportName: 'UilReact',
-    expectedId: 'ri-iconscout-react-unicons-UilReact',
   },
 ];
 

@@ -18,13 +18,11 @@ Out of the box, imports from the following libraries are detected and transforme
 - `react-feather`
 - `react-bootstrap-icons`
 - `grommet-icons`
-- `remixicon-react`
 - `@remixicon/react`
 - `devicons-react`
 - `@fortawesome/free-solid-svg-icons` (and other Font Awesome icon packs)
 - `@fortawesome/react-fontawesome`
 - `@mui/icons-material`
-- `@iconscout/react-unicons`
 
 ## Motivation
 

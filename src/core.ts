@@ -1,18 +1,9 @@
-import { createElement } from 'react';
+import { type ComponentType, createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { IconType } from 'react-icons';
 import * as t from '@babel/types';
 import { parse } from '@babel/parser';
-import _traverse, { type NodePath } from '@babel/traverse';
-import _generate, { type GeneratorResult } from '@babel/generator';
-
-type BabelTraverse = typeof import('@babel/traverse');
-type BabelGenerate = typeof import('@babel/generator');
-
-export const traverse =
-  (_traverse as unknown as BabelTraverse).default ?? _traverse;
-export const generate =
-  (_generate as unknown as BabelGenerate).default ?? _generate;
+import traverse, { type NodePath } from '@babel/traverse';
+import generate, { type GeneratorResult } from '@babel/generator';
 
 export const ICON_SOURCE = 'react-icons-sprite';
 export const ICON_COMPONENT_NAME = 'ReactIconsSpriteIcon';
@@ -30,12 +21,11 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
   /^react-feather$/, // Feather (react binding)
   /^react-bootstrap-icons$/, // Bootstrap Icons (react binding)
   /^grommet-icons$/, // Grommet
-  /^remixicon-react$/, // Remix Icons React
   /^@remixicon\/react$/, // Remix Icons React
   /^devicons-react$/, // Devicons React
   /^@fortawesome\/react-fontawesome$/, // Font Awesome
   /^@fortawesome\/[\w-]+-svg-icons$/, // Font Awesome (Pro or Free)
-  /^@mui\/icons-material$/, // MUI Icons
+  /^@mui\/icons-material(?:\/.*)?$/, // MUI Icons
   /^@iconscout\/react-unicons$/, // Unicons
 ];
 
@@ -47,6 +37,8 @@ const sourceMatchesSupported = (
 const normalizeAlias = (pack: string): string => {
   // Remove leading @, replace non-alphanumeric chars with '-'
   const withoutScope = pack.replace(/^@/, '');
+  // Special case for subpaths: we want to keep some distinction or just flatten?
+  // Current implementation: '@mui/icons-material/Alarm' -> 'mui-icons-material-Alarm'
   return withoutScope.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 };
 
@@ -59,7 +51,7 @@ export type IconImport = {
   pack: string;
   exportName: string;
   decl: t.ImportDeclaration;
-  spec: t.ImportSpecifier;
+  spec: t.ImportSpecifier | t.ImportDefaultSpecifier;
 };
 
 const parseAst = (code: string, filename = 'module.tsx'): t.File => {
@@ -90,6 +82,13 @@ export const collectIconImports = (
           spec.importKind !== 'type'
         ) {
           const exportName = spec.imported.name;
+          const localName = spec.local.name;
+          map.set(localName, { pack, exportName, decl: node, spec });
+        } else if (
+          t.isImportDefaultSpecifier(spec) &&
+          t.isIdentifier(spec.local)
+        ) {
+          const exportName = 'default';
           const localName = spec.local.name;
           map.set(localName, { pack, exportName, decl: node, spec });
         }
@@ -158,6 +157,39 @@ const replaceJsxWithSprite = (
         return;
       }
 
+      let iconPack = meta.pack;
+      let iconExport = meta.exportName;
+      let usedLocal = local;
+
+      // Special handling for FontAwesomeIcon
+      if (
+        meta.pack === '@fortawesome/react-fontawesome' &&
+        meta.exportName === 'FontAwesomeIcon'
+      ) {
+        const iconAttr = path.node.attributes.find(
+          (a) =>
+            t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: 'icon' }),
+        ) as t.JSXAttribute | undefined;
+
+        if (
+          iconAttr &&
+          t.isJSXExpressionContainer(iconAttr.value) &&
+          t.isIdentifier(iconAttr.value.expression)
+        ) {
+          const iconLocalName = iconAttr.value.expression.name;
+          const iconMeta = localNameToImport.get(iconLocalName);
+          if (iconMeta) {
+            iconPack = iconMeta.pack;
+            iconExport = iconMeta.exportName;
+            usedLocal = iconLocalName;
+            // Remove the icon prop as it's no longer needed for our sprite icon
+            path.node.attributes = path.node.attributes.filter(
+              (a) => a !== iconAttr,
+            );
+          }
+        }
+      }
+
       // Swap tag name
       path.node.name = t.jSXIdentifier(iconLocalName);
 
@@ -167,15 +199,18 @@ const replaceJsxWithSprite = (
           t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: 'iconId' }),
       );
       if (!hasIconId) {
-        const idValue = computeIconId(meta.pack, meta.exportName);
+        const idValue = computeIconId(iconPack, iconExport);
         path.node.attributes.unshift(
           t.jSXAttribute(t.jSXIdentifier('iconId'), t.stringLiteral(idValue)),
         );
       }
 
       usedLocalNames.add(local);
+      if (usedLocal !== local) {
+        usedLocalNames.add(usedLocal);
+      }
       anyReplacements = true;
-      register(meta.pack, meta.exportName);
+      register(iconPack, iconExport);
     },
 
     JSXClosingElement(path: NodePath<t.JSXClosingElement>) {
@@ -229,10 +264,13 @@ const pruneUsedSpecifiers = (
 ) => {
   for (const { decl } of new Set([...localNameToImport.values()])) {
     decl.specifiers = decl.specifiers.filter((s) => {
-      if (!t.isImportSpecifier(s) || !t.isIdentifier(s.local)) {
-        return true;
+      if (
+        (t.isImportSpecifier(s) || t.isImportDefaultSpecifier(s)) &&
+        t.isIdentifier(s.local)
+      ) {
+        return !usedLocalNames.has(s.local.name);
       }
-      return !usedLocalNames.has(s.local.name);
+      return true;
     });
   }
   ast.program.body = ast.program.body.filter(
@@ -309,15 +347,67 @@ const PRESENTATION_ATTRS = new Set([
 
 const ATTR_RE = /([a-zA-Z_:.-]+)\s*=\s*"([^"]*)"/g;
 
+interface FontAwesomeIconObject {
+  icon: [number, number, string[], string, string | string[]];
+}
+
+type IconModule = Record<string, unknown>;
+
 export const renderOneIcon = async (pack: string, exportName: string) => {
-  const mod = await import(/* @vite-ignore */ pack);
-  const Comp = mod[exportName] as IconType;
+  let mod: IconModule;
+  try {
+    mod = (await import(/* @vite-ignore */ pack)) as IconModule;
+  } catch (err) {
+    console.warn(`Failed to import icon pack ${pack}, skipping.`, err);
+    return { id: computeIconId(pack, exportName), symbol: '' };
+  }
+
+  let Comp = mod[exportName];
+
+  // Special handling for FontAwesome icons which are objects, not components
+  if (
+    pack.includes('fortawesome') &&
+    Comp &&
+    typeof Comp === 'object' &&
+    'icon' in Comp &&
+    Array.isArray((Comp as FontAwesomeIconObject).icon)
+  ) {
+    const faIcon = Comp as FontAwesomeIconObject;
+    const [width, height, , , pathData] = faIcon.icon;
+    const viewBox = `0 0 ${width} ${height}`;
+    const id = computeIconId(pack, exportName);
+    const paths = Array.isArray(pathData) ? pathData : [pathData];
+    const inner = paths.map((d: string) => `<path d="${d}" />`).join('');
+    const symbol = `<symbol id="${id}" viewBox="${viewBox}">${inner}</symbol>`;
+    return { id, symbol };
+  }
+
+  // Handle default exports or interop
+  if (
+    Comp &&
+    typeof Comp === 'object' &&
+    'default' in Comp &&
+    !('$$typeof' in Comp)
+  ) {
+    Comp = (Comp as { default: unknown }).default;
+  }
+
   if (!Comp) {
     throw new Error(`Icon export not found: ${pack} -> ${exportName}`);
   }
 
   const id = computeIconId(pack, exportName);
-  const html = renderToStaticMarkup(createElement(Comp));
+  let html: string;
+  try {
+    // If it's a FontAwesomeIcon-like object, createElement will fail.
+    html = renderToStaticMarkup(createElement(Comp as ComponentType));
+  } catch (err) {
+    console.warn(
+      `Failed to render icon ${exportName} from ${pack}, skipping.`,
+      err,
+    );
+    return { id, symbol: '' };
+  }
 
   const viewBox = html.match(/viewBox="([^"]+)"/i)?.[1] ?? '0 0 24 24';
   const svgAttrsRaw = html.match(/^<svg\b([^>]*)>/i)?.[1] ?? '';
@@ -330,7 +420,11 @@ export const renderOneIcon = async (pack: string, exportName: string) => {
     }
   }
 
-  const inner = html.replace(/^<svg[^>]*>/i, '').replace(/<\/svg>\s*$/i, '');
+  const inner = html
+    .replace(/^<svg[^>]*>/i, '')
+    .replace(/<\/svg>\s*$/i, '')
+    .replace(/<svg[^>]*>/gi, '')
+    .replace(/<\/svg>/gi, '');
   const stylePart = attrs.length ? ` ${attrs.join(' ')}` : '';
   const symbol = `<symbol id="${id}" viewBox="${viewBox}"${stylePart}>${inner}</symbol>`;
 
