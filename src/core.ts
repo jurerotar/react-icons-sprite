@@ -369,7 +369,9 @@ const resolveSpecificImportPath = (
   // - MUI Icons: @mui/icons-material/Alarm
   if (/^@mui\/icons-material(?:\/.*)?$/.test(pack)) {
     // If already specific subpath (e.g., @mui/icons-material/Alarm), just return it
-    if (pack.split('/').length > 2) return pack;
+    if (pack.split('/').length > 2) {
+      return pack;
+    }
     return `${pack}/${exportName}`;
   }
   // - Radix Icons: @radix-ui/react-icons/SunIcon
@@ -429,7 +431,7 @@ export const renderOneIcon = async (pack: string, exportName: string) => {
           }
         ).default;
       }
-    } catch (e) {
+    } catch {
       // Fall back to importing the whole pack if specific path is unavailable in this environment
       mod = (await import(/* @vite-ignore */ pack)) as IconModule;
     }
