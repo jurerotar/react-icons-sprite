@@ -2,8 +2,16 @@ import { type ComponentType, createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as t from '@babel/types';
 import { parse } from '@babel/parser';
-import traverse, { type NodePath } from '@babel/traverse';
-import generate, { type GeneratorResult } from '@babel/generator';
+import _traverse, { type NodePath } from '@babel/traverse';
+import _generate, { type GeneratorResult } from '@babel/generator';
+
+type BabelTraverse = typeof import('@babel/traverse');
+type BabelGenerate = typeof import('@babel/generator');
+
+export const traverse =
+  (_traverse as unknown as BabelTraverse).default ?? _traverse;
+export const generate =
+  (_generate as unknown as BabelGenerate).default ?? _generate;
 
 export const ICON_SOURCE = 'react-icons-sprite';
 export const ICON_COMPONENT_NAME = 'ReactIconsSpriteIcon';
@@ -477,7 +485,8 @@ export const renderOneIcon = async (pack: string, exportName: string) => {
 
   const id = computeIconId(pack, exportName);
   // If it's a FontAwesomeIcon-like object, createElement will fail.
-  const html = renderToStaticMarkup(createElement(Comp as ComponentType));
+  // Grommet-icons can fail if rendered without any props.
+  const html = renderToStaticMarkup(createElement(Comp as ComponentType, {}));
 
   const viewBox = html.match(/viewBox="([^"]+)"/i)?.[1] ?? '0 0 24 24';
   const svgAttrsRaw = html.match(/^<svg\b([^>]*)>/i)?.[1] ?? '';
