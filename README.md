@@ -18,13 +18,14 @@ Out of the box, imports from the following libraries are detected and transforme
 - `react-feather`
 - `react-bootstrap-icons`
 - `grommet-icons`
-- `remixicon-react`
 - `@remixicon/react`
 - `devicons-react`
 - `@fortawesome/free-solid-svg-icons` (and other Font Awesome icon packs)
 - `@fortawesome/react-fontawesome`
 - `@mui/icons-material`
-- `@iconscout/react-unicons`
+
+> [!NOTE]
+> `react-icons-sprite` does not bundle these libraries. You must install whichever icon packages you intend to use in your project.
 
 ## Motivation
 

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { buildSprite } from '../core';
 import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 import { collector } from '../collector';
-import type { Compiler, Compilation, WebpackPluginInstance } from 'webpack';
+import type { Compiler, Compilation } from 'webpack';
 
 export type ReactIconsSpriteWebpackPluginOptions = {
   /**
@@ -13,7 +13,7 @@ export type ReactIconsSpriteWebpackPluginOptions = {
   fileName?: string;
 };
 
-export class ReactIconsSpriteWebpackPlugin implements WebpackPluginInstance {
+export class ReactIconsSpriteWebpackPlugin {
   private readonly fileName?: string;
 
   constructor(options: ReactIconsSpriteWebpackPluginOptions = {}) {

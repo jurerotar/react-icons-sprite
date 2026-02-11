@@ -1,6 +1,5 @@
-import { createElement } from 'react';
+import { type ComponentType, createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { IconType } from 'react-icons';
 import * as t from '@babel/types';
 import { parse } from '@babel/parser';
 import _traverse, { type NodePath } from '@babel/traverse';
@@ -30,12 +29,11 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
   /^react-feather$/, // Feather (react binding)
   /^react-bootstrap-icons$/, // Bootstrap Icons (react binding)
   /^grommet-icons$/, // Grommet
-  /^remixicon-react$/, // Remix Icons React
   /^@remixicon\/react$/, // Remix Icons React
   /^devicons-react$/, // Devicons React
   /^@fortawesome\/react-fontawesome$/, // Font Awesome
   /^@fortawesome\/[\w-]+-svg-icons$/, // Font Awesome (Pro or Free)
-  /^@mui\/icons-material$/, // MUI Icons
+  /^@mui\/icons-material(?:\/.*)?$/, // MUI Icons
   /^@iconscout\/react-unicons$/, // Unicons
 ];
 
@@ -47,6 +45,8 @@ const sourceMatchesSupported = (
 const normalizeAlias = (pack: string): string => {
   // Remove leading @, replace non-alphanumeric chars with '-'
   const withoutScope = pack.replace(/^@/, '');
+  // Special case for subpaths: we want to keep some distinction or just flatten?
+  // Current implementation: '@mui/icons-material/Alarm' -> 'mui-icons-material-Alarm'
   return withoutScope.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 };
 
@@ -59,7 +59,7 @@ export type IconImport = {
   pack: string;
   exportName: string;
   decl: t.ImportDeclaration;
-  spec: t.ImportSpecifier;
+  spec: t.ImportSpecifier | t.ImportDefaultSpecifier;
 };
 
 const parseAst = (code: string, filename = 'module.tsx'): t.File => {
@@ -90,6 +90,13 @@ export const collectIconImports = (
           spec.importKind !== 'type'
         ) {
           const exportName = spec.imported.name;
+          const localName = spec.local.name;
+          map.set(localName, { pack, exportName, decl: node, spec });
+        } else if (
+          t.isImportDefaultSpecifier(spec) &&
+          t.isIdentifier(spec.local)
+        ) {
+          const exportName = 'default';
           const localName = spec.local.name;
           map.set(localName, { pack, exportName, decl: node, spec });
         }
@@ -158,6 +165,39 @@ const replaceJsxWithSprite = (
         return;
       }
 
+      let iconPack = meta.pack;
+      let iconExport = meta.exportName;
+      let usedLocal = local;
+
+      // Special handling for FontAwesomeIcon
+      if (
+        meta.pack === '@fortawesome/react-fontawesome' &&
+        meta.exportName === 'FontAwesomeIcon'
+      ) {
+        const iconAttr = path.node.attributes.find(
+          (a) =>
+            t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: 'icon' }),
+        ) as t.JSXAttribute | undefined;
+
+        if (
+          iconAttr &&
+          t.isJSXExpressionContainer(iconAttr.value) &&
+          t.isIdentifier(iconAttr.value.expression)
+        ) {
+          const iconLocalName = iconAttr.value.expression.name;
+          const iconMeta = localNameToImport.get(iconLocalName);
+          if (iconMeta) {
+            iconPack = iconMeta.pack;
+            iconExport = iconMeta.exportName;
+            usedLocal = iconLocalName;
+            // Remove the icon prop as it's no longer needed for our sprite icon
+            path.node.attributes = path.node.attributes.filter(
+              (a) => a !== iconAttr,
+            );
+          }
+        }
+      }
+
       // Swap tag name
       path.node.name = t.jSXIdentifier(iconLocalName);
 
@@ -167,15 +207,18 @@ const replaceJsxWithSprite = (
           t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: 'iconId' }),
       );
       if (!hasIconId) {
-        const idValue = computeIconId(meta.pack, meta.exportName);
+        const idValue = computeIconId(iconPack, iconExport);
         path.node.attributes.unshift(
           t.jSXAttribute(t.jSXIdentifier('iconId'), t.stringLiteral(idValue)),
         );
       }
 
       usedLocalNames.add(local);
+      if (usedLocal !== local) {
+        usedLocalNames.add(usedLocal);
+      }
       anyReplacements = true;
-      register(meta.pack, meta.exportName);
+      register(iconPack, iconExport);
     },
 
     JSXClosingElement(path: NodePath<t.JSXClosingElement>) {
@@ -229,10 +272,13 @@ const pruneUsedSpecifiers = (
 ) => {
   for (const { decl } of new Set([...localNameToImport.values()])) {
     decl.specifiers = decl.specifiers.filter((s) => {
-      if (!t.isImportSpecifier(s) || !t.isIdentifier(s.local)) {
-        return true;
+      if (
+        (t.isImportSpecifier(s) || t.isImportDefaultSpecifier(s)) &&
+        t.isIdentifier(s.local)
+      ) {
+        return !usedLocalNames.has(s.local.name);
       }
-      return !usedLocalNames.has(s.local.name);
+      return true;
     });
   }
   ast.program.body = ast.program.body.filter(
@@ -309,15 +355,138 @@ const PRESENTATION_ATTRS = new Set([
 
 const ATTR_RE = /([a-zA-Z_:.-]+)\s*=\s*"([^"]*)"/g;
 
+interface FontAwesomeIconObject {
+  icon: [number, number, string[], string, string | string[]];
+}
+
+type IconModule = Record<string, unknown>;
+
+const toKebab = (s: string) =>
+  s
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase();
+
+const resolveSpecificImportPath = (
+  pack: string,
+  exportName: string,
+): string | null => {
+  // Try to construct a path to import only the specific icon module where packages support it.
+  // Fallback to null to indicate that we should import the whole pack.
+  // Safe known patterns:
+  // - MUI Icons: @mui/icons-material/Alarm
+  if (/^@mui\/icons-material(?:\/.*)?$/.test(pack)) {
+    // If already specific subpath (e.g., @mui/icons-material/Alarm), just return it
+    if (pack.split('/').length > 2) {
+      return pack;
+    }
+    return `${pack}/${exportName}`;
+  }
+  // - Radix Icons: @radix-ui/react-icons/SunIcon
+  if (/^@radix-ui\/react-icons$/.test(pack)) {
+    return `${pack}/${exportName}`;
+  }
+  // - Heroicons v2: @heroicons/react/24/(outline|solid)/BellIcon
+  if (/^@heroicons\/react\/(?:\d{2})\/(?:outline|solid)$/.test(pack)) {
+    return `${pack}/${exportName}`;
+  }
+  // - Font Awesome icon objects: @fortawesome/free-solid-svg-icons/faCoffee
+  if (/^@fortawesome\/[\w-]+-svg-icons$/.test(pack)) {
+    return `${pack}/${exportName}`;
+  }
+  // - lucide-react: lucide-react/icons/circle (kebab-case)
+  if (/^lucide-react$/.test(pack)) {
+    return `${pack}/icons/${toKebab(exportName)}`;
+  }
+  // - @phosphor-icons/react: @phosphor-icons/react/dist/ssr/Alarm.es.js
+  if (/^@phosphor-icons\/react$/.test(pack)) {
+    return `${pack}/dist/ssr/${exportName}.es.js`;
+  }
+  // - phosphor-react: phosphor-react/dist/icons/Alarm.esm.js
+  if (/^phosphor-react$/.test(pack)) {
+    return `${pack}/dist/icons/${exportName}.esm.js`;
+  }
+  // - @tabler/icons-react: @tabler/icons-react/dist/esm/icons/IconAlarm.mjs
+  if (/^@tabler\/icons-react$/.test(pack)) {
+    return `${pack}/dist/esm/icons/${exportName}.mjs`;
+  }
+  // - react-feather: react-feather/dist/icons/alarm (kebab-case)
+  if (/^react-feather$/.test(pack)) {
+    return `${pack}/dist/icons/${toKebab(exportName)}`;
+  }
+  // - react-bootstrap-icons: react-bootstrap-icons/dist/icons/alarm (kebab-case)
+  if (/^react-bootstrap-icons$/.test(pack)) {
+    return `${pack}/dist/icons/${toKebab(exportName)}`;
+  }
+  // Many other packs either do not expose per-icon paths or have unstable paths.
+  return null;
+};
+
 export const renderOneIcon = async (pack: string, exportName: string) => {
-  const mod = await import(/* @vite-ignore */ pack);
-  const Comp = mod[exportName] as IconType;
+  let mod: IconModule;
+  // Prefer importing a specific icon path when available to avoid pulling entire icon sets.
+  // If that fails, gracefully fall back to importing the whole pack.
+  const specificPath = resolveSpecificImportPath(pack, exportName);
+  if (specificPath) {
+    try {
+      mod = (await import(/* @vite-ignore */ specificPath)) as IconModule;
+      // Some specific paths default-export the component/object
+      if (mod && 'default' in mod && Object.keys(mod).length === 1) {
+        // Normalize to named for downstream logic
+        (mod as Record<string, unknown>)[exportName] = (
+          mod as {
+            default: unknown;
+          }
+        ).default;
+      }
+    } catch {
+      // Fall back to importing the whole pack if specific path is unavailable in this environment
+      mod = (await import(/* @vite-ignore */ pack)) as IconModule;
+    }
+  } else {
+    mod = (await import(/* @vite-ignore */ pack)) as IconModule;
+  }
+
+  let Comp =
+    (mod as Record<string, unknown>)[exportName] ??
+    (mod as Record<string, unknown>).default;
+
+  // Special handling for FontAwesome icons which are objects, not components
+  if (
+    pack.includes('fortawesome') &&
+    Comp &&
+    typeof Comp === 'object' &&
+    'icon' in Comp &&
+    Array.isArray((Comp as FontAwesomeIconObject).icon)
+  ) {
+    const faIcon = Comp as FontAwesomeIconObject;
+    const [width, height, , , pathData] = faIcon.icon;
+    const viewBox = `0 0 ${width} ${height}`;
+    const id = computeIconId(pack, exportName);
+    const paths = Array.isArray(pathData) ? pathData : [pathData];
+    const inner = paths.map((d: string) => `<path d="${d}" />`).join('');
+    const symbol = `<symbol id="${id}" viewBox="${viewBox}">${inner}</symbol>`;
+    return { id, symbol };
+  }
+
+  // Handle default exports or interop
+  if (
+    Comp &&
+    typeof Comp === 'object' &&
+    'default' in Comp &&
+    !('$$typeof' in Comp)
+  ) {
+    Comp = (Comp as { default: unknown }).default;
+  }
+
   if (!Comp) {
     throw new Error(`Icon export not found: ${pack} -> ${exportName}`);
   }
 
   const id = computeIconId(pack, exportName);
-  const html = renderToStaticMarkup(createElement(Comp));
+  // If it's a FontAwesomeIcon-like object, createElement will fail.
+  // Grommet-icons can fail if rendered without any props.
+  const html = renderToStaticMarkup(createElement(Comp as ComponentType, {}));
 
   const viewBox = html.match(/viewBox="([^"]+)"/i)?.[1] ?? '0 0 24 24';
   const svgAttrsRaw = html.match(/^<svg\b([^>]*)>/i)?.[1] ?? '';
@@ -330,7 +499,11 @@ export const renderOneIcon = async (pack: string, exportName: string) => {
     }
   }
 
-  const inner = html.replace(/^<svg[^>]*>/i, '').replace(/<\/svg>\s*$/i, '');
+  const inner = html
+    .replace(/^<svg[^>]*>/i, '')
+    .replace(/<\/svg>\s*$/i, '')
+    .replace(/<svg[^>]*>/gi, '')
+    .replace(/<\/svg>/gi, '');
   const stylePart = attrs.length ? ` ${attrs.join(' ')}` : '';
   const symbol = `<symbol id="${id}" viewBox="${viewBox}"${stylePart}>${inner}</symbol>`;
 
