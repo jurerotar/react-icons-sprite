@@ -353,16 +353,93 @@ interface FontAwesomeIconObject {
 
 type IconModule = Record<string, unknown>;
 
+const toKebab = (s: string) =>
+  s
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase();
+
+const resolveSpecificImportPath = (
+  pack: string,
+  exportName: string,
+): string | null => {
+  // Try to construct a path to import only the specific icon module where packages support it.
+  // Fallback to null to indicate that we should import the whole pack.
+  // Safe known patterns:
+  // - MUI Icons: @mui/icons-material/Alarm
+  if (/^@mui\/icons-material(?:\/.*)?$/.test(pack)) {
+    // If already specific subpath (e.g., @mui/icons-material/Alarm), just return it
+    if (pack.split('/').length > 2) return pack;
+    return `${pack}/${exportName}`;
+  }
+  // - Radix Icons: @radix-ui/react-icons/SunIcon
+  if (/^@radix-ui\/react-icons$/.test(pack)) {
+    return `${pack}/${exportName}`;
+  }
+  // - Heroicons v2: @heroicons/react/24/(outline|solid)/BellIcon
+  if (/^@heroicons\/react\/(?:\d{2})\/(?:outline|solid)$/.test(pack)) {
+    return `${pack}/${exportName}`;
+  }
+  // - Font Awesome icon objects: @fortawesome/free-solid-svg-icons/faCoffee
+  if (/^@fortawesome\/[\w-]+-svg-icons$/.test(pack)) {
+    return `${pack}/${exportName}`;
+  }
+  // - lucide-react: lucide-react/icons/circle (kebab-case)
+  if (/^lucide-react$/.test(pack)) {
+    return `${pack}/icons/${toKebab(exportName)}`;
+  }
+  // - @phosphor-icons/react: @phosphor-icons/react/dist/ssr/Alarm.es.js
+  if (/^@phosphor-icons\/react$/.test(pack)) {
+    return `${pack}/dist/ssr/${exportName}.es.js`;
+  }
+  // - phosphor-react: phosphor-react/dist/icons/Alarm.esm.js
+  if (/^phosphor-react$/.test(pack)) {
+    return `${pack}/dist/icons/${exportName}.esm.js`;
+  }
+  // - @tabler/icons-react: @tabler/icons-react/dist/esm/icons/IconAlarm.mjs
+  if (/^@tabler\/icons-react$/.test(pack)) {
+    return `${pack}/dist/esm/icons/${exportName}.mjs`;
+  }
+  // - react-feather: react-feather/dist/icons/alarm (kebab-case)
+  if (/^react-feather$/.test(pack)) {
+    return `${pack}/dist/icons/${toKebab(exportName)}`;
+  }
+  // - react-bootstrap-icons: react-bootstrap-icons/dist/icons/alarm (kebab-case)
+  if (/^react-bootstrap-icons$/.test(pack)) {
+    return `${pack}/dist/icons/${toKebab(exportName)}`;
+  }
+  // Many other packs either do not expose per-icon paths or have unstable paths.
+  return null;
+};
+
 export const renderOneIcon = async (pack: string, exportName: string) => {
   let mod: IconModule;
-  try {
+  // Prefer importing a specific icon path when available to avoid pulling entire icon sets.
+  // If that fails, gracefully fall back to importing the whole pack.
+  const specificPath = resolveSpecificImportPath(pack, exportName);
+  if (specificPath) {
+    try {
+      mod = (await import(/* @vite-ignore */ specificPath)) as IconModule;
+      // Some specific paths default-export the component/object
+      if (mod && 'default' in mod && Object.keys(mod).length === 1) {
+        // Normalize to named for downstream logic
+        (mod as Record<string, unknown>)[exportName] = (
+          mod as {
+            default: unknown;
+          }
+        ).default;
+      }
+    } catch (e) {
+      // Fall back to importing the whole pack if specific path is unavailable in this environment
+      mod = (await import(/* @vite-ignore */ pack)) as IconModule;
+    }
+  } else {
     mod = (await import(/* @vite-ignore */ pack)) as IconModule;
-  } catch (err) {
-    console.warn(`Failed to import icon pack ${pack}, skipping.`, err);
-    return { id: computeIconId(pack, exportName), symbol: '' };
   }
 
-  let Comp = mod[exportName];
+  let Comp =
+    (mod as Record<string, unknown>)[exportName] ??
+    (mod as Record<string, unknown>).default;
 
   // Special handling for FontAwesome icons which are objects, not components
   if (
@@ -397,17 +474,8 @@ export const renderOneIcon = async (pack: string, exportName: string) => {
   }
 
   const id = computeIconId(pack, exportName);
-  let html: string;
-  try {
-    // If it's a FontAwesomeIcon-like object, createElement will fail.
-    html = renderToStaticMarkup(createElement(Comp as ComponentType));
-  } catch (err) {
-    console.warn(
-      `Failed to render icon ${exportName} from ${pack}, skipping.`,
-      err,
-    );
-    return { id, symbol: '' };
-  }
+  // If it's a FontAwesomeIcon-like object, createElement will fail.
+  const html = renderToStaticMarkup(createElement(Comp as ComponentType));
 
   const viewBox = html.match(/viewBox="([^"]+)"/i)?.[1] ?? '0 0 24 24';
   const svgAttrsRaw = html.match(/^<svg\b([^>]*)>/i)?.[1] ?? '';

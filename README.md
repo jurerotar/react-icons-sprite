@@ -24,6 +24,9 @@ Out of the box, imports from the following libraries are detected and transforme
 - `@fortawesome/react-fontawesome`
 - `@mui/icons-material`
 
+> [!NOTE]
+> `react-icons-sprite` does not bundle these libraries. You must install whichever icon packages you intend to use in your project.
+
 ## Motivation
 
 By default, when you use an icon library like `react-icons`, each icon is a React component. For example:
