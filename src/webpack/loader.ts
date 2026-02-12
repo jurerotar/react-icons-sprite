@@ -9,10 +9,7 @@ const reactIconsSpriteLoader: LoaderDefinitionFunction = async function (
   const id = this.resourcePath;
 
   try {
-    if (
-      !/\.(mjs|cjs|js|jsx|ts|tsx)$/i.test(id) ||
-      !/from\s+['"]react-icons\//.test(String(source))
-    ) {
+    if (!/\.(mjs|cjs|js|jsx|ts|tsx)$/i.test(id)) {
       return source;
     }
 

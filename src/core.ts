@@ -45,7 +45,6 @@ const sourceMatchesSupported = (
 const normalizeAlias = (pack: string): string => {
   // Remove leading @, replace non-alphanumeric chars with '-'
   const withoutScope = pack.replace(/^@/, '');
-  // Special case for subpaths: we want to keep some distinction or just flatten?
   // Current implementation: '@mui/icons-material/Alarm' -> 'mui-icons-material-Alarm'
   return withoutScope.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 };
@@ -371,9 +370,6 @@ const resolveSpecificImportPath = (
   pack: string,
   exportName: string,
 ): string | null => {
-  // Try to construct a path to import only the specific icon module where packages support it.
-  // Fallback to null to indicate that we should import the whole pack.
-  // Safe known patterns:
   // - MUI Icons: @mui/icons-material/Alarm
   if (/^@mui\/icons-material(?:\/.*)?$/.test(pack)) {
     // If already specific subpath (e.g., @mui/icons-material/Alarm), just return it
