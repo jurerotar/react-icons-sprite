@@ -22,7 +22,7 @@ const tsdownConfig: UserConfig = defineConfig({
       '@babel/types',
       'webpack',
       'vite',
-    ]
+    ],
   },
 });
 
