@@ -5,24 +5,15 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "lint": {
-      "dependsOn": ["^lint"]
-    },
-    "lint:check": {
-      "dependsOn": ["^lint:check"]
-    },
-    "format": {
-      "dependsOn": ["^format"]
-    },
-    "format:check": {
-      "dependsOn": ["^format:check"]
-    },
-    "type-check": {
+    "preview": {
       "dependsOn": ["^build"]
     },
-    "test": {
-      "dependsOn": ["^build"]
-    },
+    "lint": {},
+    "lint:check": {},
+    "format": {},
+    "format:check": {},
+    "type-check": {},
+    "test": {},
     "dev": {
       "cache": false,
       "persistent": true

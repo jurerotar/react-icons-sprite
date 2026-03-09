@@ -74,48 +74,37 @@ const testIcons: Array<{ pack: string; exportName: string; title: string }> = [
     pack: '@mui/icons-material',
     exportName: 'Alarm',
   },
-  {
-    title: 'Unicons',
-    pack: '@iconscout/react-unicons',
-    exportName: 'UilReact',
-  },
 ];
 
 describe('Sprite integration across icon sets', () => {
   for (const icon of testIcons) {
-    it(
-      `generates valid sprite content for ${icon.title} (${icon.pack})`,
-      { timeout: 30000 },
-      async () => {
-        const sprite = await buildSprite([
-          { pack: icon.pack, exportName: icon.exportName },
-        ]);
+    it(`generates valid sprite content for ${icon.title} (${icon.pack})`, {
+      timeout: 30000,
+    }, async () => {
+      const sprite = await buildSprite([
+        { pack: icon.pack, exportName: icon.exportName },
+      ]);
 
-        expect(sprite).toMatch(
-          /<svg[^>]*xmlns="http:\/\/www.w3.org\/2000\/svg"/,
-        );
-        expect(sprite).toContain('<defs>');
-        expect(sprite).toContain('</defs>');
-        expect(sprite.trim().endsWith('</svg>')).toBe(true);
+      expect(sprite).toMatch(/<svg[^>]*xmlns="http:\/\/www.w3.org\/2000\/svg"/);
+      expect(sprite).toContain('<defs>');
+      expect(sprite).toContain('</defs>');
+      expect(sprite.trim().endsWith('</svg>')).toBe(true);
 
-        // 2. Verify it contains the symbol with correct ID
-        // Note: computeIconId is internal, but we know the format or can just check for inclusion
-        // The ID should be ri-<normalized-pack>-<exportName>
-        const expectedIdPart = icon.exportName;
-        expect(sprite).toContain(`id="ri-`);
-        expect(sprite).toContain(expectedIdPart);
+      // 2. Verify it contains the symbol with correct ID
+      // Note: computeIconId is internal, but we know the format or can just check for inclusion
+      // The ID should be ri-<normalized-pack>-<exportName>
+      const expectedIdPart = icon.exportName;
+      expect(sprite).toContain(`id="ri-`);
+      expect(sprite).toContain(expectedIdPart);
 
-        // 3. Verify it contains actual path/graphic definition
-        // Most icons use <path ... />, <g ... />, <circle ... />, etc.
-        // We expect at least one of these inside the symbol.
-        expect(sprite).toMatch(
-          /<(path|g|circle|rect|polyline|polygon|ellipse)/i,
-        );
+      // 3. Verify it contains actual path/graphic definition
+      // Most icons use <path ... />, <g ... />, <circle ... />, etc.
+      // We expect at least one of these inside the symbol.
+      expect(sprite).toMatch(/<(path|g|circle|rect|polyline|polygon|ellipse)/i);
 
-        // 4. Verify viewBox is present
-        expect(sprite).toContain('viewBox=');
-      },
-    );
+      // 4. Verify viewBox is present
+      expect(sprite).toContain('viewBox=');
+    });
   }
 
   it('covers all patterns in DEFAULT_ICON_SOURCES', () => {

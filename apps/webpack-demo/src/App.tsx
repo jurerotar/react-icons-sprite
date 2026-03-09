@@ -1,5 +1,5 @@
 import { BiAlarm } from 'react-icons/bi';
-import { Circle } from 'lucide-react';
+import { ArrowBigDown } from 'lucide-react';
 import { SunIcon } from '@radix-ui/react-icons';
 import { BellIcon } from '@heroicons/react/24/outline';
 import { IconAlertCircle } from '@tabler/icons-react';
@@ -16,98 +16,241 @@ import AlarmMui from '@mui/icons-material/Alarm';
 
 const App = () => {
   return (
-    <div>
-      <h1>React Icons Sprite - Demo</h1>
+    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
+      <h1 style={{ textAlign: 'center' }}>React Icons Sprite - Webpack Demo</h1>
 
-      <section>
-        <h2>react-icons/bi</h2>
-        <BiAlarm
-          size={32}
-          color="red"
-        />
-      </section>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: '20px',
+        }}
+      >
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            react-icons/bi
+          </h2>
+          <BiAlarm
+            size={32}
+            color="red"
+          />
+        </section>
 
-      <section>
-        <h2>lucide-react</h2>
-        <Circle
-          size={32}
-          color="blue"
-        />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            lucide-react
+          </h2>
+          <ArrowBigDown
+            size={32}
+            color="blue"
+          />
+        </section>
 
-      <section>
-        <h2>@radix-ui/react-icons</h2>
-        <SunIcon
-          width={32}
-          height={32}
-        />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            @radix-ui/react-icons
+          </h2>
+          <SunIcon
+            width={32}
+            height={32}
+          />
+        </section>
 
-      <section>
-        <h2>@heroicons/react</h2>
-        <BellIcon
-          width={32}
-          height={32}
-        />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            @heroicons/react
+          </h2>
+          <BellIcon
+            width={32}
+            height={32}
+          />
+        </section>
 
-      <section>
-        <h2>@tabler/icons-react</h2>
-        <IconAlertCircle size={32} />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            @tabler/icons-react
+          </h2>
+          <IconAlertCircle size={32} />
+        </section>
 
-      <section>
-        <h2>phosphor-react</h2>
-        <Alarm size={32} />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            phosphor-react
+          </h2>
+          <Alarm size={32} />
+        </section>
 
-      <section>
-        <h2>@phosphor-icons/react</h2>
-        <AcornIcon size={32} />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            @phosphor-icons/react
+          </h2>
+          <AcornIcon size={32} />
+        </section>
 
-      <section>
-        <h2>react-feather</h2>
-        <Bell size={32} />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            react-feather
+          </h2>
+          <Bell size={32} />
+        </section>
 
-      <section>
-        <h2>react-bootstrap-icons</h2>
-        <BootstrapAlarm size={32} />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            react-bootstrap-icons
+          </h2>
+          <BootstrapAlarm size={32} />
+        </section>
 
-      <section>
-        <h2>grommet-icons</h2>
-        <Add size={32} />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            grommet-icons
+          </h2>
+          <Add size="32px" />
+        </section>
 
-      <section>
-        <h2>remixicon-react</h2>
-        <AcornIcon size={32} />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            remixicon-react
+          </h2>
+          <RiAlarmFill size={32} />
+        </section>
 
-      <section>
-        <h2>@remixicon/react</h2>
-        <RiAlarmFill size={32} />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            @remixicon/react
+          </h2>
+          <RiAlarmFill size={32} />
+        </section>
 
-      <section>
-        <h2>devicons-react</h2>
-        <BehancePlain size={32} />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            devicons-react
+          </h2>
+          <BehancePlain size={32} />
+        </section>
 
-      <section>
-        <h2>@fortawesome/react-fontawesome</h2>
-        <FontAwesomeIcon
-          icon={faCoffee}
-          size="2x"
-        />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            @fortawesome/react-fontawesome
+          </h2>
+          <FontAwesomeIcon
+            icon={faCoffee}
+            size="2x"
+          />
+        </section>
 
-      <section>
-        <h2>@mui/icons-material</h2>
-        <AlarmMui fontSize="large" />
-      </section>
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            @mui/icons-material
+          </h2>
+          <AlarmMui fontSize="large" />
+        </section>
+      </div>
     </div>
   );
 };

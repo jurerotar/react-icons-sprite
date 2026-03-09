@@ -34,7 +34,6 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
   /^@fortawesome\/react-fontawesome$/, // Font Awesome
   /^@fortawesome\/[\w-]+-svg-icons$/, // Font Awesome (Pro or Free)
   /^@mui\/icons-material(?:\/.*)?$/, // MUI Icons
-  /^@iconscout\/react-unicons$/, // Unicons
 ];
 
 const sourceMatchesSupported = (

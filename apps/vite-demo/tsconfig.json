@@ -1,25 +1,4 @@
 {
-  "compilerOptions": {
-    "outDir": "dist",
-    "target": "ESNext",
-    "module": "ESNext",
-    "allowJs": false,
-    "jsx": "react-jsx",
-    "skipLibCheck": true,
-    "declaration": true,
-    "forceConsistentCasingInFileNames": true,
-    "allowSyntheticDefaultImports": true,
-    "erasableSyntaxOnly": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "resolveJsonModule": true,
-    "verbatimModuleSyntax": true,
-    "strictPropertyInitialization": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "moduleResolution": "Bundler",
-    "noEmit": true,
-    "strict": true
-  },
+  "extends": "../../tsconfig.json",
   "include": ["src", "tests"]
 }

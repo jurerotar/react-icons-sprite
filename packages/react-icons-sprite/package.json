@@ -6,24 +6,26 @@
   "description": "",
   "author": "Jure Rotar <hello@jurerotar.com>",
   "homepage": "https://github.com/jurerotar/react-icons-sprite#README",
-  "main": "dist/icon.mjs",
-  "types": "dist/icon.d.mts",
+  "main": "dist/index.mjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.mts",
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs",
-      "default": "./dist/index.mjs"
+      "import": "./dist/index.mjs"
+    },
+    "./icon": {
+      "types": "./dist/icon.d.mts",
+      "import": "./dist/icon.mjs"
     },
     "./vite": {
       "types": "./dist/vite/plugin.d.mts",
-      "import": "./dist/vite/plugin.mjs",
-      "default": "./dist/vite/plugin.mjs"
+      "import": "./dist/vite/plugin.mjs"
     },
     "./webpack": {
       "types": "./dist/webpack/plugin.d.mts",
-      "import": "./dist/webpack/plugin.mjs",
-      "default": "./dist/webpack/plugin.mjs"
+      "import": "./dist/webpack/plugin.mjs"
     },
     "./webpack/loader": {
       "types": "./dist/webpack/loader.d.mts",
@@ -67,43 +69,27 @@
     "@babel/types": "7.29.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.3.14",
-    "@emotion/react": "11.14.0",
-    "@emotion/styled": "11.14.1",
-    "@fortawesome/free-solid-svg-icons": "7.2.0",
-    "@fortawesome/react-fontawesome": "3.2.0",
-    "@heroicons/react": "2.2.0",
-    "@iconscout/react-unicons": "2.2.5",
-    "@mui/icons-material": "7.3.7",
-    "@phosphor-icons/react": "2.1.10",
-    "@radix-ui/react-icons": "1.3.2",
-    "@remixicon/react": "4.9.0",
-    "@tabler/icons-react": "3.36.1",
     "@types/babel__generator": "7.27.0",
     "@types/babel__traverse": "7.28.0",
-    "@types/node": "25.2.3",
+    "@types/node": "25.3.5",
     "@types/react-dom": "19.2.3",
-    "@typescript/native-preview": "7.0.0-dev.20260211.1",
-    "devicons-react": "1.5.0",
-    "grommet-icons": "4.14.0",
-    "lucide-react": "0.563.0",
-    "phosphor-react": "1.4.1",
+    "@typescript/native-preview": "7.0.0-dev.20260309.1",
     "react": "19.2.4",
-    "react-bootstrap-icons": "1.11.6",
     "react-dom": "19.2.4",
-    "react-feather": "2.0.10",
-    "react-icons": "5.5.0",
-    "tsdown": "0.20.3",
+    "tsdown": "0.21.1",
     "typescript": "5.9.3",
     "vite": "7.3.1",
     "vitest": "4.0.18",
-    "webpack": "5.105.1"
+    "webpack": "5.105.4"
   },
   "keywords": [
     "vite",
     "vite-plugin",
     "webpack",
     "webpack-plugin",
+    "rsbuild",
+    "rsbuild-plugin",
+    "esbuild",
     "rollup",
     "rolldown",
     "react-icons",
