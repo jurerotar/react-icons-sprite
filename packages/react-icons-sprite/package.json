@@ -54,7 +54,7 @@
     "lint": "biome lint --write  --no-errors-on-unmatched",
     "lint:check": "biome lint  --no-errors-on-unmatched",
     "type-check": "tsgo",
-    "test": "vitest run",
+    "test": "vitest",
     "prepublishOnly": "npm run build",
     "release": "npm publish --access public"
   },
