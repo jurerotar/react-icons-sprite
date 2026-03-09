@@ -1,117 +1,25 @@
 {
-  "name": "react-icons-sprite",
-  "version": "0.7.0",
+  "name": "react-icons-sprite-monorepo",
+  "private": true,
   "type": "module",
-  "license": "MIT",
-  "description": "",
-  "author": "Jure Rotar <hello@jurerotar.com>",
-  "homepage": "https://github.com/jurerotar/react-icons-sprite#README",
-  "main": "dist/icon.mjs",
-  "types": "dist/icon.d.mts",
-  "sideEffects": false,
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs",
-      "default": "./dist/index.mjs"
-    },
-    "./vite": {
-      "types": "./dist/vite/plugin.d.mts",
-      "import": "./dist/vite/plugin.mjs",
-      "default": "./dist/vite/plugin.mjs"
-    },
-    "./webpack": {
-      "types": "./dist/webpack/plugin.d.mts",
-      "import": "./dist/webpack/plugin.mjs",
-      "default": "./dist/webpack/plugin.mjs"
-    },
-    "./webpack/loader": {
-      "types": "./dist/webpack/loader.d.mts",
-      "import": "./dist/webpack/loader.mjs",
-      "default": "./dist/webpack/loader.mjs"
-    }
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jurerotar/react-icons-sprite.git"
-  },
-  "bugs": {
-    "url": "https://github.com/jurerotar/react-icons-sprite/issues"
-  },
-  "files": [
-    "dist"
+  "workspaces": [
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown --watch",
-    "format:check": "biome format --no-errors-on-unmatched",
-    "format": "biome format --write --no-errors-on-unmatched",
-    "lint:check": "biome lint  --no-errors-on-unmatched",
-    "lint": "biome lint --write  --no-errors-on-unmatched",
-    "type-check": "tsgo",
-    "test": "vitest run",
-    "prepublishOnly": "npm run build",
-    "release": "npm publish --access public"
-  },
-  "peerDependencies": {
-    "react": ">= 16",
-    "react-dom": ">= 16"
-  },
-  "dependencies": {
-    "@babel/generator": "7.29.1",
-    "@babel/parser": "7.29.0",
-    "@babel/traverse": "7.29.0",
-    "@babel/types": "7.29.0"
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "lint:check": "turbo lint:check",
+    "format": "turbo format",
+    "format:check": "turbo format:check",
+    "test": "turbo test",
+    "type-check": "turbo type-check"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.14",
-    "@emotion/react": "11.14.0",
-    "@emotion/styled": "11.14.1",
-    "@fortawesome/free-solid-svg-icons": "7.2.0",
-    "@fortawesome/react-fontawesome": "3.2.0",
-    "@heroicons/react": "2.2.0",
-    "@iconscout/react-unicons": "2.2.5",
-    "@mui/icons-material": "7.3.7",
-    "@phosphor-icons/react": "2.1.10",
-    "@radix-ui/react-icons": "1.3.2",
-    "@remixicon/react": "4.9.0",
-    "@tabler/icons-react": "3.36.1",
-    "@types/babel__generator": "7.27.0",
-    "@types/babel__traverse": "7.28.0",
-    "@types/node": "25.2.3",
-    "@types/react-dom": "19.2.3",
-    "@typescript/native-preview": "7.0.0-dev.20260211.1",
-    "devicons-react": "1.5.0",
-    "grommet-icons": "4.14.0",
-    "lucide-react": "0.563.0",
-    "phosphor-react": "1.4.1",
-    "react": "19.2.4",
-    "react-bootstrap-icons": "1.11.6",
-    "react-dom": "19.2.4",
-    "react-feather": "2.0.10",
-    "react-icons": "5.5.0",
-    "tsdown": "0.20.3",
-    "typescript": "5.9.3",
-    "vite": "7.3.1",
-    "vitest": "4.0.18",
-    "webpack": "5.105.1"
+    "turbo": "2.8.14",
+    "typescript": "5.9.3"
   },
-  "keywords": [
-    "vite",
-    "vite-plugin",
-    "webpack",
-    "webpack-plugin",
-    "rollup",
-    "rolldown",
-    "react-icons",
-    "react",
-    "icons",
-    "svg",
-    "svg-sprite",
-    "spritesheet",
-    "icon-sprite"
-  ]
+  "packageManager": "npm@11.7.0"
 }

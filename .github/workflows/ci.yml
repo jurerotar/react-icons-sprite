@@ -35,7 +35,7 @@ jobs:
         uses: ./.github/actions/node-setup
 
       - name: Run type check
-        run: npm run type-check
+        run: npx turbo run type-check
 
   lint:
     name: Lint check
@@ -50,7 +50,7 @@ jobs:
         uses: ./.github/actions/node-setup
 
       - name: Run lint check
-        run: npm run lint:check
+        run: npx turbo run lint:check
 
   format:
     name: Format check
@@ -65,7 +65,7 @@ jobs:
         uses: ./.github/actions/node-setup
 
       - name: Run format check
-        run: npm run format:check
+        run: npx turbo run format:check
 
   test:
     name: Run tests
@@ -81,4 +81,4 @@ jobs:
 
       - name: Run tests
         id: run-tests
-        run: npm run test
+        run: npx turbo run test
