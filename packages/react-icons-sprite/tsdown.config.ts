@@ -12,16 +12,18 @@ const tsdownConfig: UserConfig = defineConfig({
   format: ['esm'],
   dts: true,
   clean: true,
-  external: [
-    'react',
-    'react-dom/server',
-    '@babel/generator',
-    '@babel/parser',
-    '@babel/traverse',
-    '@babel/types',
-    'webpack',
-    'vite',
-  ],
+  deps: {
+    neverBundle: [
+      'react',
+      'react-dom/server',
+      '@babel/generator',
+      '@babel/parser',
+      '@babel/traverse',
+      '@babel/types',
+      'webpack',
+      'vite',
+    ]
+  },
 });
 
 export default tsdownConfig;
