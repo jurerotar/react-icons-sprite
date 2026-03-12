@@ -13,6 +13,7 @@ import { BehancePlain } from 'devicons-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCoffee } from '@fortawesome/free-solid-svg-icons';
 import AlarmMui from '@mui/icons-material/Alarm';
+import { Add as CarbonAdd } from '@carbon/icons-react';
 
 const App = () => {
   return (
@@ -249,6 +250,20 @@ const App = () => {
             @mui/icons-material
           </h2>
           <AlarmMui fontSize="large" />
+        </section>
+
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            @carbon/icons-react
+          </h2>
+          <CarbonAdd size={32} />
         </section>
       </div>
     </div>

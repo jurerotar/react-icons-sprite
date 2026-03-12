@@ -1,8 +1,14 @@
 {
+  "$schema": "https://www.schemastore.org/package.json",
   "name": "rsbuild-demo",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jurerotar/react-icons-sprite",
+    "directory": "apps/rsbuild-demo"
+  },
   "scripts": {
     "dev": "rsbuild dev",
     "build": "rsbuild build",
@@ -14,6 +20,7 @@
     "type-check": "tsgo"
   },
   "dependencies": {
+    "@carbon/icons-react": "11.76.0",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
     "@fortawesome/free-solid-svg-icons": "7.2.0",
@@ -40,8 +47,8 @@
   "devDependencies": {
     "typescript": "5.9.3",
     "@rsbuild/core": "1.7.3",
-    "@rsbuild/plugin-react": "1.4.5",
-    "@types/react": "19.2.13",
+    "@rsbuild/plugin-react": "1.4.6",
+    "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@typescript/native-preview": "7.0.0-dev.20260309.1"
   }

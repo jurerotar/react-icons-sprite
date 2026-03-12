@@ -82,6 +82,12 @@ const cases: Case[] = [
     exportName: 'Alarm',
     expectedId: 'ri-mui-icons-material-Alarm',
   },
+  {
+    title: 'Carbon Icons',
+    pack: '@carbon/icons-react',
+    exportName: 'Add',
+    expectedId: 'ri-carbon-icons-react-Add',
+  },
 ];
 
 describe('supported icon packages — transformModule integration', () => {

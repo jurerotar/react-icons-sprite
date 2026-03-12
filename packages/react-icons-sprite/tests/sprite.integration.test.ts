@@ -74,6 +74,11 @@ const testIcons: Array<{ pack: string; exportName: string; title: string }> = [
     pack: '@mui/icons-material',
     exportName: 'Alarm',
   },
+  {
+    title: 'Carbon Icons',
+    pack: '@carbon/icons-react',
+    exportName: 'Add',
+  },
 ];
 
 describe('Sprite integration across icon sets', () => {

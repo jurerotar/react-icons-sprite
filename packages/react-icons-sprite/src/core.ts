@@ -34,6 +34,7 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
   /^@fortawesome\/react-fontawesome$/, // Font Awesome
   /^@fortawesome\/[\w-]+-svg-icons$/, // Font Awesome (Pro or Free)
   /^@mui\/icons-material(?:\/.*)?$/, // MUI Icons
+  /^@carbon\/icons-react$/, // Carbon Icons
 ];
 
 const sourceMatchesSupported = (
@@ -412,6 +413,10 @@ const resolveSpecificImportPath = (
   // - react-bootstrap-icons: react-bootstrap-icons/dist/icons/alarm (kebab-case)
   if (/^react-bootstrap-icons$/.test(pack)) {
     return `${pack}/dist/icons/${toKebab(exportName)}`;
+  }
+  // - @carbon/icons-react: @carbon/icons-react/lib/<IconName>.js
+  if (/^@carbon\/icons-react$/.test(pack)) {
+    return `${pack}/lib/${exportName}.js`;
   }
   // Many other packs either do not expose per-icon paths or have unstable paths.
   return null;

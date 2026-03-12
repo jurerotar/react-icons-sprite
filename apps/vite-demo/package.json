@@ -1,8 +1,14 @@
 {
+  "$schema": "https://www.schemastore.org/package.json",
   "name": "vite-demo",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jurerotar/react-icons-sprite",
+    "directory": "apps/vite-demo"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -14,6 +20,7 @@
     "type-check": "tsgo"
   },
   "dependencies": {
+    "@carbon/icons-react": "11.76.0",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
     "@fortawesome/free-solid-svg-icons": "7.2.0",

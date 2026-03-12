@@ -26,6 +26,7 @@ Out of the box, imports from the following libraries are detected and transforme
 - `@fortawesome/free-solid-svg-icons` (and other Font Awesome icon packs)
 - `@fortawesome/react-fontawesome`
 - `@mui/icons-material`
+- `@carbon/icons-react`
 
 > [!NOTE]
 > `react-icons-sprite` does not bundle these libraries. You must install whichever icon packages you intend to use in
@@ -199,6 +200,34 @@ module.exports = {
     }),
   ],
 };
+```
+
+### Rsbuild
+
+```ts
+// rsbuild.config.ts
+import { defineConfig } from '@rsbuild/core';
+import { pluginReact } from '@rsbuild/plugin-react';
+import { ReactIconsSpriteWebpackPlugin } from 'react-icons-sprite/webpack';
+
+export default defineConfig({
+  plugins: [pluginReact()],
+  tools: {
+    rspack: (config, { env }) => {
+      if (env === 'production') {
+        config.plugins?.push(new ReactIconsSpriteWebpackPlugin());
+        config.module?.rules?.push({
+          test: /\.(ts|tsx|js|jsx)$/,
+          use: [
+            {
+              loader: 'react-icons-sprite/webpack/loader',
+            },
+          ],
+        });
+      }
+    },
+  },
+});
 ```
 
 ## How it works
