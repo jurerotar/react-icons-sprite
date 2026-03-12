@@ -1,0 +1,14 @@
+# https://github.com/evilmartians/lefthook
+
+output: false
+
+pre-commit:
+  commands:
+    biome:
+      stage_fixed: true
+      run: npx turbo run format
+
+pre-push:
+  commands:
+    biome-ci:
+      run: npx turbo run format:check lint:check

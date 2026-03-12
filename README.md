@@ -1,8 +1,11 @@
 # react-icons-sprite
 
-`react-icons-sprite` is a lightweight plugin for Vite and Webpack that turns React icon components into a single SVG spritesheet and rewrites your code to reference those symbols via `<use>`.
+`react-icons-sprite` is a lightweight plugin for Vite and Webpack that turns React icon components into a single SVG
+spritesheet and rewrites your code to reference those symbols via `<use>`.
 
-It supports multiple React icon packages that export icons as individual React components. This approach both shrinks your bundle (no more inlined React components for every icon) and reduces runtime overhead, since React no longer has to reconcile large, nested SVG trees.
+It supports multiple React icon packages that export icons as individual React components. This approach both shrinks
+your bundle (no more inlined React components for every icon) and reduces runtime overhead, since React no longer has to
+reconcile large, nested SVG trees.
 
 ## Supported icon libraries
 
@@ -23,9 +26,11 @@ Out of the box, imports from the following libraries are detected and transforme
 - `@fortawesome/free-solid-svg-icons` (and other Font Awesome icon packs)
 - `@fortawesome/react-fontawesome`
 - `@mui/icons-material`
+- `@carbon/icons-react`
 
 > [!NOTE]
-> `react-icons-sprite` does not bundle these libraries. You must install whichever icon packages you intend to use in your project.
+> `react-icons-sprite` does not bundle these libraries. You must install whichever icon packages you intend to use in
+> your project.
 
 ## Motivation
 
@@ -120,23 +125,25 @@ This is a big win when you’re rendering icons in lists, tables, or maps where 
 
 ### Performance comparison
 
-| icon (pack)        | react-icons icon render mean time |     react-icons-sprite icon render mean time | Relative difference     |
-|--------------------|----------------------------------:|---------------------------------------------:|------------------------:|
-| **FiCpu** (fi)     |                          0.188 ms |                                        0.048 ms | 74.6% reduction         |
-| **MdBuild** (md)   |                          0.198 ms |                                        0.048 ms | 76.0% reduction         |
-| **FaCamera** (fa)  |                             0.162 ms |                                        0.015 ms | 90.7% reduction         |
-| **IoAperture** (io5)|                             0.029 ms |                                        0.015 ms | 49.7% reduction         |
-| **BiBell** (bi)    |                             0.023 ms |                                        0.014 ms | 38.5% reduction         |
-| **AiOutlineAlert** (ai) |                             0.023 ms |                                        0.014 ms | 38.3% reduction         |
-| **BsAlarm** (bs)   |                             0.027 ms |                                        0.014 ms | 47.4% reduction         |
-| **RiAnchor** (ri)  |                             0.023 ms |                                        0.014 ms | 38.6% reduction         |
-| **CgArrows** (cg)  |                             0.029 ms |                                        0.014 ms | 52.0% reduction         |
-| **HiAcademicCap** (hi) |                             0.023 ms |                                        0.014 ms | 38.6% reduction         |
-| **SiTypescript** (si) |                             0.023 ms |                                        0.014 ms | 39.7% reduction         |
-| **TiThLarge** (ti) |                             0.023 ms |                                        0.014 ms | 40.0% reduction         |
+| icon (pack)             | react-icons icon render mean time | react-icons-sprite icon render mean time | Relative difference |
+|-------------------------|----------------------------------:|-----------------------------------------:|--------------------:|
+| **FiCpu** (fi)          |                          0.188 ms |                                 0.048 ms |     74.6% reduction |
+| **MdBuild** (md)        |                          0.198 ms |                                 0.048 ms |     76.0% reduction |
+| **FaCamera** (fa)       |                          0.162 ms |                                 0.015 ms |     90.7% reduction |
+| **IoAperture** (io5)    |                          0.029 ms |                                 0.015 ms |     49.7% reduction |
+| **BiBell** (bi)         |                          0.023 ms |                                 0.014 ms |     38.5% reduction |
+| **AiOutlineAlert** (ai) |                          0.023 ms |                                 0.014 ms |     38.3% reduction |
+| **BsAlarm** (bs)        |                          0.027 ms |                                 0.014 ms |     47.4% reduction |
+| **RiAnchor** (ri)       |                          0.023 ms |                                 0.014 ms |     38.6% reduction |
+| **CgArrows** (cg)       |                          0.029 ms |                                 0.014 ms |     52.0% reduction |
+| **HiAcademicCap** (hi)  |                          0.023 ms |                                 0.014 ms |     38.6% reduction |
+| **SiTypescript** (si)   |                          0.023 ms |                                 0.014 ms |     39.7% reduction |
+| **TiThLarge** (ti)      |                          0.023 ms |                                 0.014 ms |     40.0% reduction |
 
-* **Test details / machine:** **Lenovo Legion 5 Pro 16ACH6H** (Ryzen 7 5800H — 8 cores / 16 threads, base ≈ 3.2 GHz, turbo ≈ 4.4 GHz, DDR4-3200 memory); Node.js v24.10.0.
-* Differences will vary based on icons used in your application, but they will generally be the range of 50-75% reduction in render time. Larger icons will generate a larger difference.
+* **Test details / machine:** **Lenovo Legion 5 Pro 16ACH6H** (Ryzen 7 5800H — 8 cores / 16 threads, base ≈ 3.2 GHz,
+  turbo ≈ 4.4 GHz, DDR4-3200 memory); Node.js v24.10.0.
+* Differences will vary based on icons used in your application, but they will generally be the range of 50-75%
+  reduction in render time. Larger icons will generate a larger difference.
 
 ## Installation
 
@@ -147,6 +154,7 @@ npm install --save-dev react-icons-sprite
 ```
 
 ### Vite
+
 Add the plugin to the `plugins` array in your Vite config.
 
 ```typescript
@@ -160,7 +168,9 @@ export default defineConfig({
 ```
 
 ### Webpack
-Add the loader to transform modules that import icons and install the plugin to emit the sprite and rewrite the placeholder URL.
+
+Add the loader to transform modules that import icons and install the plugin to emit the sprite and rewrite the
+placeholder URL.
 
 ```js
 // webpack.config.js (v5)
@@ -192,13 +202,109 @@ module.exports = {
 };
 ```
 
+### Rsbuild
+
+```ts
+// rsbuild.config.ts
+import { defineConfig } from '@rsbuild/core';
+import { pluginReact } from '@rsbuild/plugin-react';
+import { ReactIconsSpriteWebpackPlugin } from 'react-icons-sprite/webpack';
+
+export default defineConfig({
+  plugins: [pluginReact()],
+  tools: {
+    rspack: (config, { env }) => {
+      if (env === 'production') {
+        config.plugins?.push(new ReactIconsSpriteWebpackPlugin());
+        config.module?.rules?.push({
+          test: /\.(ts|tsx|js|jsx)$/,
+          use: [
+            {
+              loader: 'react-icons-sprite/webpack/loader',
+            },
+          ],
+        });
+      }
+    },
+  },
+});
+```
+
 ## How it works
 
-In **development mode**, the plugin does nothing special. Icons are rendered as they normally would from your icon library. This keeps hot module replacement (HMR) snappy — there’s no extra parsing of the codebase or regenerating of the sprite on every save. If the plugin were to build the sprite during dev, it would need to constantly scan for icon imports and rebuild the sheet, which is expensive and slows down iteration. So, in dev, you get the normal component behavior.
+In **development mode**, the plugin does nothing special. Icons are rendered as they normally would from your icon
+library. This keeps hot module replacement (HMR) snappy — there’s no extra parsing of the codebase or regenerating of
+the sprite on every save. If the plugin were to build the sprite during dev, it would need to constantly scan for icon
+imports and rebuild the sheet, which is expensive and slows down iteration. So, in dev, you get the normal component
+behavior.
 
-In **build mode**, the plugin transforms your code. It parses each module, looks for imports from supported React icon packages, and rewrites the JSX. Instead of rendering full inline `<svg>` trees, it replaces them with `<ReactIconsSpriteIcon iconId="..." />`. While doing this, it collects every unique icon used across the project. After the bundling step, the plugin renders all those icons once to static markup and generates a single SVG file containing `<symbol>` definitions for each one. Finally, it rewrites your bundle to point every `<ReactIconsSpriteIcon>` at that spritesheet using a `<use>` tag.
+In **build mode**, the plugin transforms your code. It parses each module, looks for imports from supported React icon
+packages, and rewrites the JSX. Instead of rendering full inline `<svg>` trees, it replaces them with
+`<ReactIconsSpriteIcon iconId="..." />`. While doing this, it collects every unique icon used across the project. After
+the bundling step, the plugin renders all those icons once to static markup and generates a single SVG file containing
+`<symbol>` definitions for each one. Finally, it rewrites your bundle to point every `<ReactIconsSpriteIcon>` at that
+spritesheet using a `<use>` tag.
 
-The result: during development you keep fast feedback loops, and in production you ship a single optimized sprite file with lightweight `<use>` references.
+The result: during development you keep fast feedback loops, and in production you ship a single optimized sprite file
+with lightweight `<use>` references.
+
+### Usage with react-router framework mode
+
+`react-router`'s framework mode allows you to pre-render pages. In order for `react-icons-sprite` to work with
+pre-rendered pages, include the bellow `buildEnd` hook.
+
+```ts
+// react-router.config.ts
+import type { Config } from '@react-router/dev/config';
+import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from 'react-icons-sprite';
+
+export const replaceReactIconsSpritePlaceholdersOnPreRenderedPages: NonNullable<
+  Config['buildEnd']
+> = async ({ reactRouterConfig }) => {
+  const clientDir = resolve('build/client');
+
+  const [svgSpriteFile] = await Array.fromAsync(
+    glob('./build/client/react-icons-sprite-*.svg'),
+  );
+
+  const svgSpriteName = svgSpriteFile.replace(/build[/\\]client[/\\]?/, '/');
+
+  const preRenderedFileUrls =
+    (reactRouterConfig.prerender!.paths as string[]).map((path) => {
+      return resolve(clientDir, `.${path}`, 'index.html');
+    });
+
+  await Promise.all(
+    preRenderedFileUrls.map(async (filePath) => {
+      const content = await readFile(filePath, 'utf8');
+
+      if (!content.includes(REACT_ICONS_SPRITE_URL_PLACEHOLDER)) {
+        return;
+      }
+
+      const updatedContent = content.replaceAll(
+        REACT_ICONS_SPRITE_URL_PLACEHOLDER,
+        svgSpriteName,
+      );
+
+      await writeFile(filePath, updatedContent, 'utf8');
+    }),
+  );
+};
+
+const reactRouterConfig: Config = {
+  prerender: {
+    paths: [
+      // Your list of pages to pre-render
+    ],
+  },
+  buildEnd: async (args) => {
+    await replaceReactIconsSpritePlaceholdersOnPreRenderedPages(args);
+  },
+};
+
+export default reactRouterConfig;
+```
 
 ## Contributing
 

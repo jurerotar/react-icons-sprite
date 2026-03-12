@@ -20,6 +20,5 @@
     "moduleResolution": "Bundler",
     "noEmit": true,
     "strict": true
-  },
-  "include": ["src", "tests"]
+  }
 }

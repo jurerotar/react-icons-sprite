@@ -21,6 +21,10 @@ export class ReactIconsSpriteWebpackPlugin {
   }
 
   apply(compiler: Compiler): void {
+    if (compiler.options.mode === 'development') {
+      return;
+    }
+
     const pluginName = 'react-icons-sprite-webpack-plugin';
 
     compiler.hooks.thisCompilation.tap(

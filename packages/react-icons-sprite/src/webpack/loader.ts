@@ -6,6 +6,10 @@ const reactIconsSpriteLoader: LoaderDefinitionFunction = async function (
   this,
   source,
 ): Promise<string> {
+  if (this.mode === 'development') {
+    return source;
+  }
+
   const id = this.resourcePath;
 
   try {

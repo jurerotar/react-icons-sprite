@@ -10,7 +10,22 @@
     "ignoreUnknown": true,
     "includes": ["**"]
   },
-  "assist": { "actions": { "source": { "organizeImports": "off" } } },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              ":NODE:",
+              ":PACKAGE:",
+              ":PATH:"
+            ]
+          }
+        }
+      }
+    }
+  },
   "formatter": {
     "useEditorconfig": true,
     "formatWithErrors": true,
@@ -19,16 +34,18 @@
   "linter": {
     "rules": {
       "recommended": true,
+      "a11y": {
+        "noSvgWithoutTitle": "off"
+      },
       "suspicious": {
+        "noDocumentCookie": "off",
+        "noUnknownAtRules": "off",
         "noConsole": {
           "level": "error",
           "options": {
-            "allow": ["error", "warn"]
+            "allow": ["error"]
           }
         }
-      },
-      "a11y": {
-        "noSvgWithoutTitle": "off"
       },
       "correctness": {
         "noUnusedVariables": "error",
