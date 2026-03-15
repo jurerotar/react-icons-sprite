@@ -81,12 +81,50 @@ const getRange = (node: OxcNode): [number, number] | null => {
   return null;
 };
 
+const getParseLangCandidates = (
+  filename: string,
+): Array<'js' | 'jsx' | 'ts' | 'tsx'> => {
+  const clean = filename.split('?', 1)[0] ?? filename;
+  const lower = clean.toLowerCase();
+
+  if (lower.endsWith('.tsx')) {
+    return ['tsx', 'ts', 'jsx', 'js'];
+  }
+  if (lower.endsWith('.ts')) {
+    return ['ts', 'tsx', 'js', 'jsx'];
+  }
+  if (lower.endsWith('.jsx')) {
+    return ['jsx', 'js', 'tsx', 'ts'];
+  }
+  return ['js', 'jsx', 'ts', 'tsx'];
+};
+
 const parseAst = (code: string, filename: string): ParseResult => {
-  return parseSync(filename, code, {
-    lang: 'tsx',
-    sourceType: 'module',
-    range: true,
-  });
+  const languages = getParseLangCandidates(filename);
+
+  let firstResult: ParseResult | undefined;
+
+  for (const lang of languages) {
+    const result = parseSync(filename, code, {
+      lang,
+      sourceType: 'module',
+      range: true,
+    });
+
+    firstResult ??= result;
+    if (result.errors.length === 0) {
+      return result;
+    }
+  }
+
+  return (
+    firstResult ??
+    parseSync(filename, code, {
+      lang: 'tsx',
+      sourceType: 'module',
+      range: true,
+    })
+  );
 };
 
 const collectIconImports = (
@@ -396,31 +434,54 @@ export const transformModule = (
     return { code, map: null, anyReplacements: false };
   }
 
-  const declSpecifierCount = new Map<OxcNode, number>();
+  const declToAllSpecs = new Map<OxcNode, OxcNode[]>();
+  const declToUsedSpecs = new Map<OxcNode, OxcNode[]>();
   for (const { decl, spec } of localNameToImport.values()) {
-    const localName = (spec as OxcNode).local as { name?: string } | undefined;
-    if (!localName?.name || !usedLocalNames.has(localName.name)) {
-      continue;
-    }
     const declNode = decl as OxcNode;
-    let count = declSpecifierCount.get(declNode);
-    if (typeof count !== 'number') {
-      count = 0;
+    const specNode = spec as OxcNode;
+
+    const all = declToAllSpecs.get(declNode) ?? [];
+    if (all.length === 0) {
       const specifiers = (declNode.specifiers as OxcNode[] | undefined) ?? [];
       for (const oneSpec of specifiers) {
         if (
           oneSpec.type === 'ImportSpecifier' ||
           oneSpec.type === 'ImportDefaultSpecifier'
         ) {
-          count += 1;
+          all.push(oneSpec);
         }
       }
-      declSpecifierCount.set(declNode, count);
+      declToAllSpecs.set(declNode, all);
     }
-    if (count <= 1) {
+
+    const localName = specNode.local as { name?: string } | undefined;
+    if (!localName?.name || !usedLocalNames.has(localName.name)) {
+      continue;
+    }
+
+    const used = declToUsedSpecs.get(declNode) ?? [];
+    used.push(specNode);
+    declToUsedSpecs.set(declNode, used);
+  }
+
+  for (const [declNode, usedSpecs] of declToUsedSpecs.entries()) {
+    const allSpecs = declToAllSpecs.get(declNode) ?? [];
+    if (allSpecs.length > 0 && usedSpecs.length >= allSpecs.length) {
       removeEntireImport(ms, code, declNode);
-    } else {
-      removeImportSpecifier(ms, code, spec as OxcNode);
+      continue;
+    }
+
+    const byStartDesc = [...usedSpecs].sort((a, b) => {
+      const aRange = getRange(a);
+      const bRange = getRange(b);
+      if (!aRange || !bRange) {
+        return 0;
+      }
+      return bRange[0] - aRange[0];
+    });
+
+    for (const usedSpec of byStartDesc) {
+      removeImportSpecifier(ms, code, usedSpec);
     }
   }
 

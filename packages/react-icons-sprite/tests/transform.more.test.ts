@@ -79,6 +79,26 @@ describe('transformModule - edge cases', () => {
     expect(res.code).not.toMatch(/\{\s*BiAlarm\s*\}/);
   });
 
+  it('removes entire icon import cleanly when all specifiers are transformed', () => {
+    const code = `
+      import {
+        BiAlarm,
+        BiAdjust,
+      } from 'react-icons/bi';
+      export const C = () => <><BiAlarm /><BiAdjust /></>;
+    `;
+
+    const res = transformModule(code, id, () => {});
+    expect(res.code).not.toContain("from 'react-icons/bi'");
+    expect(res.code).not.toMatch(/^\s*,\s*$/m);
+    expect(res.code).toContain(
+      `<${ICON_COMPONENT_NAME} iconId="ri-react-icons-bi-BiAlarm" />`,
+    );
+    expect(res.code).toContain(
+      `<${ICON_COMPONENT_NAME} iconId="ri-react-icons-bi-BiAdjust" />`,
+    );
+  });
+
   it('leaves module intact if there are react-icons imports but no JSX usage', () => {
     const code = `
       import { BiAlarm } from 'react-icons/bi';
@@ -87,5 +107,30 @@ describe('transformModule - edge cases', () => {
     const res = transformModule(code, id, () => {});
     expect(res.anyReplacements).toBe(false);
     expect(res.code).toBe(code);
+  });
+
+  it('parses plain .js with comparison operators without throwing', () => {
+    const code = `
+      import { BiAlarm } from 'react-icons/bi';
+      const check = 1 < 2 && 3 > 2;
+      export const C = () => BiAlarm ? check : false;
+    `;
+
+    const res = transformModule(code, 'plain.js', () => {});
+    expect(res.anyReplacements).toBe(false);
+    expect(res.code).toBe(code);
+  });
+
+  it('transforms .js module with JSX icon usage', () => {
+    const code = `
+      import { BiAlarm } from 'react-icons/bi';
+      export const C = () => <BiAlarm />;
+    `;
+
+    const res = transformModule(code, 'component.js', () => {});
+    expect(res.anyReplacements).toBe(true);
+    expect(res.code).toContain(
+      `<${ICON_COMPONENT_NAME} iconId="ri-react-icons-bi-BiAlarm" />`,
+    );
   });
 });
