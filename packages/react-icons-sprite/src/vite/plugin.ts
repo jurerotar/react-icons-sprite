@@ -51,6 +51,7 @@ export const reactIconsSprite = (
             collector.add(pack, exportName);
           },
           DEFAULT_ICON_SOURCES,
+          { sourceMap: true },
         );
         if (!anyReplacements) {
           return null;

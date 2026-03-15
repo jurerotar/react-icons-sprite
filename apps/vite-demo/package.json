@@ -11,7 +11,6 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
     "preview": "vite preview",
     "lint": "biome lint --write --no-errors-on-unmatched",
     "lint:check": "biome lint --no-errors-on-unmatched",
@@ -48,7 +47,7 @@
     "typescript": "5.9.3",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.0",
+    "@vitejs/plugin-react": "6.0.1",
     "@typescript/native-preview": "7.0.0-dev.20260309.1",
     "vite": "8.0.0"
   }

@@ -6,7 +6,7 @@ import type {
   PluginContext,
   NormalizedOutputOptions,
   OutputBundle,
-} from 'rollup';
+} from 'rolldown';
 
 type EmitOptions = Parameters<PluginContext['emitFile']>[0];
 type EmitOptionsLike = EmitOptions & { name?: string };
