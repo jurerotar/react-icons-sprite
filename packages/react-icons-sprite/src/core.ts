@@ -81,7 +81,7 @@ const getRange = (node: OxcNode): [number, number] | null => {
   return null;
 };
 
-const parseAst = (code: string, filename = 'module.tsx'): ParseResult => {
+const parseAst = (code: string, filename: string): ParseResult => {
   return parseSync(filename, code, {
     lang: 'tsx',
     sourceType: 'module',
@@ -118,18 +118,23 @@ const collectIconImports = (
         }
         const imported = spec.imported as { type?: string; name?: string };
         const local = spec.local as { type?: string; name?: string };
-        if (imported?.type === 'Identifier' && local?.type === 'Identifier') {
-          map.set(local.name ?? '', {
+        if (
+          imported?.type === 'Identifier' &&
+          local?.type === 'Identifier' &&
+          imported.name &&
+          local.name
+        ) {
+          map.set(local.name, {
             pack,
-            exportName: imported.name ?? '',
+            exportName: imported.name,
             decl: node,
             spec,
           });
         }
       } else if (spec.type === 'ImportDefaultSpecifier') {
         const local = spec.local as { type?: string; name?: string };
-        if (local?.type === 'Identifier') {
-          map.set(local.name ?? '', {
+        if (local?.type === 'Identifier' && local.name) {
+          map.set(local.name, {
             pack,
             exportName: 'default',
             decl: node,
@@ -252,12 +257,18 @@ type TransformResult = {
   anyReplacements: boolean;
 };
 
+type TransformModuleOptions = {
+  sourceMap?: boolean;
+};
+
 export const transformModule = (
   code: string,
   id: string,
   register: (pack: string, exportName: string) => void,
   sources: ReadonlyArray<RegExp> = DEFAULT_ICON_SOURCES,
+  options: TransformModuleOptions = {},
 ): TransformResult => {
+  const { sourceMap = false } = options;
   const parsed = parseAst(code, id);
   if (parsed.errors.length > 0) {
     throw new Error(parsed.errors[0]?.message ?? `Failed to parse: ${id}`);
@@ -325,7 +336,6 @@ export const transformModule = (
                 iconPack = iconMeta.pack;
                 iconExport = iconMeta.exportName;
                 usedLocal = iconLocal;
-                removeImportSpecifier;
                 const iconAttrRange = getRange(iconAttr);
                 if (iconAttrRange) {
                   let [from, to] = iconAttrRange;
@@ -367,7 +377,11 @@ export const transformModule = (
         return;
       }
       const local = (name as { name?: string }).name;
-      if (!local || local === iconLocalName || !localNameToImport.has(local)) {
+      if (!local || local === iconLocalName) {
+        return;
+      }
+      const meta = localNameToImport.get(local);
+      if (!meta) {
         return;
       }
       const nameRange = getRange(name);
@@ -382,19 +396,28 @@ export const transformModule = (
     return { code, map: null, anyReplacements: false };
   }
 
+  const declSpecifierCount = new Map<OxcNode, number>();
   for (const { decl, spec } of localNameToImport.values()) {
     const localName = (spec as OxcNode).local as { name?: string } | undefined;
     if (!localName?.name || !usedLocalNames.has(localName.name)) {
       continue;
     }
     const declNode = decl as OxcNode;
-    const declSpecs = (
-      (declNode.specifiers as OxcNode[] | undefined) ?? []
-    ).filter(
-      (s) =>
-        s.type === 'ImportSpecifier' || s.type === 'ImportDefaultSpecifier',
-    );
-    if (declSpecs.length <= 1) {
+    let count = declSpecifierCount.get(declNode);
+    if (typeof count !== 'number') {
+      count = 0;
+      const specifiers = (declNode.specifiers as OxcNode[] | undefined) ?? [];
+      for (const oneSpec of specifiers) {
+        if (
+          oneSpec.type === 'ImportSpecifier' ||
+          oneSpec.type === 'ImportDefaultSpecifier'
+        ) {
+          count += 1;
+        }
+      }
+      declSpecifierCount.set(declNode, count);
+    }
+    if (count <= 1) {
       removeEntireImport(ms, code, declNode);
     } else {
       removeImportSpecifier(ms, code, spec as OxcNode);
@@ -405,18 +428,25 @@ export const transformModule = (
     ms.prepend(`import { ${iconLocalName} } from "${ICON_SOURCE}";\n`);
   }
 
-  const outCode = fixIconSelfClosingSpacing(ms.toString(), iconLocalName);
-  const rawMap = ms.generateMap({
-    source: id,
-    includeContent: true,
-    hires: true,
-  }) as unknown as SourceMapLike;
-  const map: SourceMapLike = {
-    ...rawMap,
-    sourcesContent: rawMap.sourcesContent?.map(
-      (sourceContent) => sourceContent ?? '',
-    ),
-  };
+  const transformedCode = ms.toString();
+  const outCode = transformedCode.includes(`<${iconLocalName}`)
+    ? fixIconSelfClosingSpacing(transformedCode, iconLocalName)
+    : transformedCode;
+  const map = sourceMap
+    ? (() => {
+        const rawMap = ms.generateMap({
+          source: id,
+          includeContent: true,
+          hires: true,
+        }) as unknown as SourceMapLike;
+        return {
+          ...rawMap,
+          sourcesContent: rawMap.sourcesContent?.map(
+            (sourceContent) => sourceContent ?? '',
+          ),
+        } as SourceMapLike;
+      })()
+    : null;
 
   return {
     code: outCode,
@@ -538,43 +568,26 @@ export const renderOneIcon = async (pack: string, exportName: string) => {
     mod = (await import(/* @vite-ignore */ pack)) as IconModule;
   }
 
-  let Comp =
-    (mod as Record<string, unknown>)[exportName] ??
-    (mod as Record<string, unknown>).default;
-
-  // Special handling for FontAwesome icons which are objects, not components
-  if (
-    pack.includes('fortawesome') &&
-    Comp &&
-    typeof Comp === 'object' &&
-    'icon' in Comp &&
-    Array.isArray((Comp as FontAwesomeIconObject).icon)
-  ) {
-    const faIcon = Comp as FontAwesomeIconObject;
-    const [width, height, , , pathData] = faIcon.icon;
-    const viewBox = `0 0 ${width} ${height}`;
-    const id = computeIconId(pack, exportName);
-    const paths = Array.isArray(pathData) ? pathData : [pathData];
-    const inner = paths.map((d: string) => `<path d="${d}" />`).join('');
-    const symbol = `<symbol id="${id}" viewBox="${viewBox}">${inner}</symbol>`;
-    return { id, symbol };
-  }
-
-  // Handle default exports or interop
-  if (
-    Comp &&
-    typeof Comp === 'object' &&
-    'default' in Comp &&
-    !('$$typeof' in Comp)
-  ) {
-    Comp = (Comp as { default: unknown }).default;
-  }
+  const modRecord = mod as Record<string, unknown>;
+  const Comp = modRecord[exportName] ?? modRecord.default;
 
   if (!Comp) {
     throw new Error(`Icon export not found: ${pack} -> ${exportName}`);
   }
 
   const id = computeIconId(pack, exportName);
+
+  // Special handling for FontAwesome icons which are objects, not components
+  if (pack.includes('fortawesome')) {
+    const faIcon = Comp as FontAwesomeIconObject;
+    const [width, height, , , pathData] = faIcon.icon;
+    const viewBox = `0 0 ${width} ${height}`;
+    const paths = Array.isArray(pathData) ? pathData : [pathData];
+    const inner = paths.map((d: string) => `<path d="${d}" />`).join('');
+    const symbol = `<symbol id="${id}" viewBox="${viewBox}">${inner}</symbol>`;
+    return { id, symbol };
+  }
+
   // If it's a FontAwesomeIcon-like object, createElement will fail.
   // Grommet-icons can fail if rendered without any props.
   const html = renderToStaticMarkup(createElement(Comp as ComponentType, {}));

@@ -9,7 +9,9 @@ describe('transformModule - source maps', () => {
       export const C = () => <BiAlarm/>;
     `;
 
-    const res = transformModule(code, id, () => {});
+    const res = transformModule(code, id, () => {}, undefined, {
+      sourceMap: true,
+    });
     expect(res.anyReplacements).toBe(true);
     expect(res.map).not.toBeNull();
     expect(res.map!.sources?.[0]).toBe(id);
