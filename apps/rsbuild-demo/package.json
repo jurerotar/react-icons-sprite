@@ -11,7 +11,6 @@
   },
   "scripts": {
     "dev": "rsbuild dev",
-    "build": "rsbuild build",
     "preview": "rsbuild preview",
     "lint": "biome lint --write --no-errors-on-unmatched",
     "lint:check": "biome lint --no-errors-on-unmatched",

@@ -1,17 +1,8 @@
 import { type ComponentType, createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import * as t from '@babel/types';
-import { parse } from '@babel/parser';
-import _traverse, { type NodePath } from '@babel/traverse';
-import _generate, { type GeneratorResult } from '@babel/generator';
-
-type BabelTraverse = typeof import('@babel/traverse');
-type BabelGenerate = typeof import('@babel/generator');
-
-export const traverse =
-  (_traverse as unknown as BabelTraverse).default ?? _traverse;
-export const generate =
-  (_generate as unknown as BabelGenerate).default ?? _generate;
+import MagicString from 'magic-string';
+import { parseSync, Visitor } from 'oxc-parser';
+import type { JSXOpeningElement, JSXClosingElement } from '@oxc-project/types';
 
 export const ICON_SOURCE = 'react-icons-sprite';
 export const ICON_COMPONENT_NAME = 'ReactIconsSpriteIcon';
@@ -54,113 +45,247 @@ export const computeIconId = (pack: string, exportName: string): string => {
   return `ri-${alias}-${exportName}`;
 };
 
+type SourceMapLike = {
+  version: number;
+  file?: string;
+  sources: string[];
+  sourcesContent?: string[];
+  names: string[];
+  mappings: string;
+};
+
 export type IconImport = {
   pack: string;
   exportName: string;
-  decl: t.ImportDeclaration;
-  spec: t.ImportSpecifier | t.ImportDefaultSpecifier;
+  decl: unknown;
+  spec: unknown;
 };
 
-const parseAst = (code: string, filename = 'module.tsx'): t.File => {
-  return parse(code, {
+type ParseResult = ReturnType<typeof parseSync>;
+type OxcProgram = ParseResult['program'];
+type OxcNode = {
+  type?: string;
+  range?: [number, number];
+  start?: number;
+  end?: number;
+  [key: string]: unknown;
+};
+
+const getRange = (node: OxcNode): [number, number] | null => {
+  if (Array.isArray(node.range) && node.range.length === 2) {
+    return [node.range[0], node.range[1]];
+  }
+  if (typeof node.start === 'number' && typeof node.end === 'number') {
+    return [node.start, node.end];
+  }
+  return null;
+};
+
+const parseAst = (code: string, filename = 'module.tsx'): ParseResult => {
+  return parseSync(filename, code, {
+    lang: 'tsx',
     sourceType: 'module',
-    plugins: ['jsx', 'typescript'],
-    sourceFilename: filename,
+    range: true,
   });
 };
 
-export const collectIconImports = (
-  ast: t.File,
+const collectIconImports = (
+  program: OxcProgram,
   sources: ReadonlyArray<RegExp> = DEFAULT_ICON_SOURCES,
 ): Map<string, IconImport> => {
   const map = new Map<string, IconImport>();
-  for (const node of ast.program.body) {
+  const body = (program as unknown as { body?: OxcNode[] }).body ?? [];
+
+  for (const node of body) {
+    if (node.type !== 'ImportDeclaration') {
+      continue;
+    }
+    const sourceNode = node.source as { value?: string } | undefined;
+    const pack = sourceNode?.value;
     if (
-      t.isImportDeclaration(node) &&
-      sourceMatchesSupported(node.source.value, sources) &&
-      node.importKind !== 'type'
+      typeof pack !== 'string' ||
+      !sourceMatchesSupported(pack, sources) ||
+      node.importKind === 'type'
     ) {
-      const pack = node.source.value;
-      for (const spec of node.specifiers) {
-        if (
-          t.isImportSpecifier(spec) &&
-          t.isIdentifier(spec.imported) &&
-          t.isIdentifier(spec.local) &&
-          spec.importKind !== 'type'
-        ) {
-          const exportName = spec.imported.name;
-          const localName = spec.local.name;
-          map.set(localName, { pack, exportName, decl: node, spec });
-        } else if (
-          t.isImportDefaultSpecifier(spec) &&
-          t.isIdentifier(spec.local)
-        ) {
-          const exportName = 'default';
-          const localName = spec.local.name;
-          map.set(localName, { pack, exportName, decl: node, spec });
+      continue;
+    }
+
+    const specifiers = (node.specifiers as OxcNode[] | undefined) ?? [];
+    for (const spec of specifiers) {
+      if (spec.type === 'ImportSpecifier') {
+        if (spec.importKind === 'type') {
+          continue;
+        }
+        const imported = spec.imported as { type?: string; name?: string };
+        const local = spec.local as { type?: string; name?: string };
+        if (imported?.type === 'Identifier' && local?.type === 'Identifier') {
+          map.set(local.name ?? '', {
+            pack,
+            exportName: imported.name ?? '',
+            decl: node,
+            spec,
+          });
+        }
+      } else if (spec.type === 'ImportDefaultSpecifier') {
+        const local = spec.local as { type?: string; name?: string };
+        if (local?.type === 'Identifier') {
+          map.set(local.name ?? '', {
+            pack,
+            exportName: 'default',
+            decl: node,
+            spec,
+          });
         }
       }
     }
   }
+
   return map;
 };
 
-const findExistingIconImport = (ast: t.File) => {
+const findExistingIconImport = (program: OxcProgram) => {
   let iconLocalName = ICON_COMPONENT_NAME;
   let hasIconImport = false;
+  const body = (program as unknown as { body?: OxcNode[] }).body ?? [];
 
-  for (const n of ast.program.body) {
-    if (t.isImportDeclaration(n) && n.source.value === ICON_SOURCE) {
-      for (const s of n.specifiers) {
-        if (
-          t.isImportSpecifier(s) &&
-          t.isIdentifier(s.imported, { name: ICON_COMPONENT_NAME })
-        ) {
-          hasIconImport = true;
-          iconLocalName = t.isIdentifier(s.local)
-            ? s.local.name
-            : ICON_COMPONENT_NAME;
-          break;
-        }
+  for (const node of body) {
+    if (node.type !== 'ImportDeclaration') {
+      continue;
+    }
+    const sourceNode = node.source as { value?: string } | undefined;
+    if (sourceNode?.value !== ICON_SOURCE) {
+      continue;
+    }
+    const specifiers = (node.specifiers as OxcNode[] | undefined) ?? [];
+    for (const spec of specifiers) {
+      if (spec.type !== 'ImportSpecifier') {
+        continue;
       }
-      if (hasIconImport) {
+      const imported = spec.imported as { type?: string; name?: string };
+      if (
+        imported?.type === 'Identifier' &&
+        imported.name === ICON_COMPONENT_NAME
+      ) {
+        hasIconImport = true;
+        const local = spec.local as
+          | { type?: string; name?: string }
+          | undefined;
+        iconLocalName =
+          local?.type === 'Identifier' && local.name
+            ? local.name
+            : ICON_COMPONENT_NAME;
         break;
       }
     }
+    if (hasIconImport) {
+      break;
+    }
   }
 
-  return {
-    hasIconImport,
-    iconLocalName,
-  };
+  return { hasIconImport, iconLocalName };
 };
 
-const replaceJsxWithSprite = (
-  ast: t.File,
-  localNameToImport: Map<string, IconImport>,
-  iconLocalName: string,
-  register: (pack: string, exportName: string) => void,
+const removeImportSpecifier = (
+  ms: MagicString,
+  code: string,
+  spec: OxcNode,
 ) => {
+  const range = getRange(spec);
+  if (!range) {
+    return;
+  }
+
+  const [start, end] = range;
+  let from = start;
+  let to = end;
+
+  let i = start - 1;
+  while (i >= 0 && /\s/.test(code[i])) {
+    i -= 1;
+  }
+  if (i >= 0 && code[i] === ',') {
+    from = i;
+  } else {
+    let j = end;
+    while (j < code.length && /\s/.test(code[j])) {
+      j += 1;
+    }
+    if (j < code.length && code[j] === ',') {
+      to = j + 1;
+    }
+  }
+  ms.remove(from, to);
+};
+
+const removeEntireImport = (ms: MagicString, code: string, decl: OxcNode) => {
+  const range = getRange(decl);
+  if (!range) {
+    return;
+  }
+
+  let [from, to] = range;
+  while (to < code.length && /[ \t]/.test(code[to])) {
+    to += 1;
+  }
+  if (code[to] === '\r' && code[to + 1] === '\n') {
+    to += 2;
+  } else if (code[to] === '\n') {
+    to += 1;
+  }
+  ms.remove(from, to);
+};
+
+const fixIconSelfClosingSpacing = (
+  outputCode: string,
+  iconLocalName: string,
+) => {
+  const re = new RegExp(`<${iconLocalName}([^>]*?)\/>`, 'g');
+  return outputCode.replace(re, (_match, attrs: string) => {
+    const normalizedAttrs = attrs.replace(/\s+$/g, '');
+    return `<${iconLocalName}${normalizedAttrs} />`;
+  });
+};
+
+type TransformResult = {
+  code: string;
+  map: SourceMapLike | null;
+  anyReplacements: boolean;
+};
+
+export const transformModule = (
+  code: string,
+  id: string,
+  register: (pack: string, exportName: string) => void,
+  sources: ReadonlyArray<RegExp> = DEFAULT_ICON_SOURCES,
+): TransformResult => {
+  const parsed = parseAst(code, id);
+  if (parsed.errors.length > 0) {
+    throw new Error(parsed.errors[0]?.message ?? `Failed to parse: ${id}`);
+  }
+
+  const { program } = parsed;
+  const localNameToImport = collectIconImports(program, sources);
+  if (localNameToImport.size === 0) {
+    return { code, map: null, anyReplacements: false };
+  }
+
+  const { hasIconImport, iconLocalName } = findExistingIconImport(program);
+  const ms = new MagicString(code);
   const usedLocalNames = new Set<string>();
   let anyReplacements = false;
 
-  const isAlreadyIcon = (
-    name: t.JSXIdentifier | t.JSXMemberExpression | t.JSXNamespacedName,
-  ) => t.isJSXIdentifier(name) && name.name === iconLocalName;
-
-  traverse(ast, {
-    JSXOpeningElement(path: NodePath<t.JSXOpeningElement>) {
-      const name = path.node.name;
-      if (!t.isJSXIdentifier(name)) {
+  const visitor = new Visitor({
+    JSXOpeningElement(node: JSXOpeningElement) {
+      const name = node.name as unknown as OxcNode | undefined;
+      if (name?.type !== 'JSXIdentifier') {
         return;
       }
-
-      const local = name.name;
+      const local = (name as { name?: string }).name;
+      if (!local || local === iconLocalName) {
+        return;
+      }
       const meta = localNameToImport.get(local);
       if (!meta) {
-        return;
-      }
-      if (isAlreadyIcon(name)) {
         return;
       }
 
@@ -168,48 +293,64 @@ const replaceJsxWithSprite = (
       let iconExport = meta.exportName;
       let usedLocal = local;
 
-      // Special handling for FontAwesomeIcon
+      const attrs = (node.attributes as unknown as OxcNode[] | undefined) ?? [];
+      let hasIconId = false;
+      let iconAttr: OxcNode | undefined;
+      for (const a of attrs) {
+        if (a.type !== 'JSXAttribute') {
+          continue;
+        }
+        const attrName = a.name as { type?: string; name?: string } | undefined;
+        if (attrName?.type === 'JSXIdentifier' && attrName.name === 'iconId') {
+          hasIconId = true;
+        }
+        if (attrName?.type === 'JSXIdentifier' && attrName.name === 'icon') {
+          iconAttr = a;
+        }
+      }
+
       if (
         meta.pack === '@fortawesome/react-fontawesome' &&
-        meta.exportName === 'FontAwesomeIcon'
+        meta.exportName === 'FontAwesomeIcon' &&
+        iconAttr
       ) {
-        const iconAttr = path.node.attributes.find(
-          (a) =>
-            t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: 'icon' }),
-        ) as t.JSXAttribute | undefined;
-
-        if (
-          iconAttr &&
-          t.isJSXExpressionContainer(iconAttr.value) &&
-          t.isIdentifier(iconAttr.value.expression)
-        ) {
-          const iconLocalName = iconAttr.value.expression.name;
-          const iconMeta = localNameToImport.get(iconLocalName);
-          if (iconMeta) {
-            iconPack = iconMeta.pack;
-            iconExport = iconMeta.exportName;
-            usedLocal = iconLocalName;
-            // Remove the icon prop as it's no longer needed for our sprite icon
-            path.node.attributes = path.node.attributes.filter(
-              (a) => a !== iconAttr,
-            );
+        const value = iconAttr.value as OxcNode | undefined;
+        if (value?.type === 'JSXExpressionContainer') {
+          const expr = value.expression as OxcNode | undefined;
+          if (expr?.type === 'Identifier') {
+            const iconLocal = (expr as { name?: string }).name;
+            if (iconLocal) {
+              const iconMeta = localNameToImport.get(iconLocal);
+              if (iconMeta) {
+                iconPack = iconMeta.pack;
+                iconExport = iconMeta.exportName;
+                usedLocal = iconLocal;
+                removeImportSpecifier;
+                const iconAttrRange = getRange(iconAttr);
+                if (iconAttrRange) {
+                  let [from, to] = iconAttrRange;
+                  while (to < code.length && /\s/.test(code[to])) {
+                    to += 1;
+                  }
+                  ms.remove(from, to);
+                }
+              }
+            }
           }
         }
       }
 
-      // Swap tag name
-      path.node.name = t.jSXIdentifier(iconLocalName);
+      const nameRange = getRange(name);
+      if (nameRange) {
+        ms.overwrite(nameRange[0], nameRange[1], iconLocalName);
+      }
 
-      // Add iconId if missing
-      const hasIconId = path.node.attributes.some(
-        (a) =>
-          t.isJSXAttribute(a) && t.isJSXIdentifier(a.name, { name: 'iconId' }),
-      );
       if (!hasIconId) {
         const idValue = computeIconId(iconPack, iconExport);
-        path.node.attributes.unshift(
-          t.jSXAttribute(t.jSXIdentifier('iconId'), t.stringLiteral(idValue)),
-        );
+        const insertPos = nameRange?.[1];
+        if (typeof insertPos === 'number') {
+          ms.appendLeft(insertPos, ` iconId="${idValue}"`);
+        }
       }
 
       usedLocalNames.add(local);
@@ -220,116 +361,66 @@ const replaceJsxWithSprite = (
       register(iconPack, iconExport);
     },
 
-    JSXClosingElement(path: NodePath<t.JSXClosingElement>) {
-      const name = path.node.name;
-      if (!t.isJSXIdentifier(name)) {
+    JSXClosingElement(node: JSXClosingElement) {
+      const name = node.name as unknown as OxcNode | undefined;
+      if (name?.type !== 'JSXIdentifier') {
         return;
       }
-      const local = name.name;
-      if (!localNameToImport.has(local)) {
+      const local = (name as { name?: string }).name;
+      if (!local || local === iconLocalName || !localNameToImport.has(local)) {
         return;
       }
-      if (!isAlreadyIcon(name)) {
-        path.node.name = t.jSXIdentifier(iconLocalName);
+      const nameRange = getRange(name);
+      if (nameRange) {
+        ms.overwrite(nameRange[0], nameRange[1], iconLocalName);
       }
     },
   });
-
-  return {
-    usedLocalNames,
-    anyReplacements,
-  };
-};
-
-const insertIconImport = (
-  ast: t.File,
-  iconLocalName: string = ICON_COMPONENT_NAME,
-): void => {
-  const firstImportIndex = ast.program.body.findIndex((n) =>
-    t.isImportDeclaration(n),
-  );
-  const iconImportDecl = t.importDeclaration(
-    [
-      t.importSpecifier(
-        t.identifier(iconLocalName),
-        t.identifier(ICON_COMPONENT_NAME),
-      ),
-    ],
-    t.stringLiteral(ICON_SOURCE),
-  );
-  if (firstImportIndex >= 0) {
-    ast.program.body.splice(firstImportIndex + 1, 0, iconImportDecl);
-  } else {
-    ast.program.body.unshift(iconImportDecl);
-  }
-};
-
-const pruneUsedSpecifiers = (
-  ast: t.File,
-  localNameToImport: Map<string, IconImport>,
-  usedLocalNames: Set<string>,
-) => {
-  for (const { decl } of new Set([...localNameToImport.values()])) {
-    decl.specifiers = decl.specifiers.filter((s) => {
-      if (
-        (t.isImportSpecifier(s) || t.isImportDefaultSpecifier(s)) &&
-        t.isIdentifier(s.local)
-      ) {
-        return !usedLocalNames.has(s.local.name);
-      }
-      return true;
-    });
-  }
-  ast.program.body = ast.program.body.filter(
-    (n) => !t.isImportDeclaration(n) || n.specifiers.length > 0,
-  );
-};
-
-const generateCode = (ast: t.File, origCode: string, id: string) => {
-  const { code, map } = generate(
-    ast,
-    { sourceMaps: true, sourceFileName: id },
-    origCode,
-  );
-
-  return {
-    code,
-    map,
-  };
-};
-
-export const transformModule = (
-  code: string,
-  id: string,
-  register: (pack: string, exportName: string) => void,
-  sources: ReadonlyArray<RegExp> = DEFAULT_ICON_SOURCES,
-): GeneratorResult & { anyReplacements: boolean } => {
-  const ast = parseAst(code, id);
-  const localNameToImport = collectIconImports(ast, sources);
-  if (localNameToImport.size === 0) {
-    return { code, map: null, anyReplacements: false };
-  }
-
-  const { hasIconImport, iconLocalName } = findExistingIconImport(ast);
-  const { usedLocalNames, anyReplacements } = replaceJsxWithSprite(
-    ast,
-    localNameToImport,
-    iconLocalName,
-    register,
-  );
+  visitor.visit(program);
 
   if (!anyReplacements) {
     return { code, map: null, anyReplacements: false };
   }
 
-  if (!hasIconImport) {
-    insertIconImport(ast, iconLocalName);
+  for (const { decl, spec } of localNameToImport.values()) {
+    const localName = (spec as OxcNode).local as { name?: string } | undefined;
+    if (!localName?.name || !usedLocalNames.has(localName.name)) {
+      continue;
+    }
+    const declNode = decl as OxcNode;
+    const declSpecs = (
+      (declNode.specifiers as OxcNode[] | undefined) ?? []
+    ).filter(
+      (s) =>
+        s.type === 'ImportSpecifier' || s.type === 'ImportDefaultSpecifier',
+    );
+    if (declSpecs.length <= 1) {
+      removeEntireImport(ms, code, declNode);
+    } else {
+      removeImportSpecifier(ms, code, spec as OxcNode);
+    }
   }
 
-  pruneUsedSpecifiers(ast, localNameToImport, usedLocalNames);
+  if (!hasIconImport) {
+    ms.prepend(`import { ${iconLocalName} } from "${ICON_SOURCE}";\n`);
+  }
+
+  const outCode = fixIconSelfClosingSpacing(ms.toString(), iconLocalName);
+  const rawMap = ms.generateMap({
+    source: id,
+    includeContent: true,
+    hires: true,
+  }) as unknown as SourceMapLike;
+  const map: SourceMapLike = {
+    ...rawMap,
+    sourcesContent: rawMap.sourcesContent?.map(
+      (sourceContent) => sourceContent ?? '',
+    ),
+  };
 
   return {
-    ...generateCode(ast, code, id),
+    code: outCode,
+    map,
     anyReplacements,
   };
 };

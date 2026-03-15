@@ -10,9 +10,7 @@
     "directory": "apps/webpack-demo"
   },
   "scripts": {
-    "start": "webpack serve --mode development",
     "dev": "webpack serve --mode development",
-    "build": "webpack --mode production",
     "preview": "webpack serve --mode production",
     "lint": "biome lint --write --no-errors-on-unmatched",
     "lint:check": "biome lint --no-errors-on-unmatched",

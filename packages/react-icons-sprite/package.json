@@ -65,10 +65,8 @@
     "react-dom": ">= 16"
   },
   "dependencies": {
-    "@babel/generator": "7.29.1",
-    "@babel/parser": "7.29.0",
-    "@babel/traverse": "7.29.0",
-    "@babel/types": "7.29.0"
+    "magic-string": "^0.30.21",
+    "oxc-parser": "^0.119.0"
   },
   "devDependencies": {
     "@carbon/icons-react": "11.76.0",
@@ -79,10 +77,10 @@
     "@typescript/native-preview": "7.0.0-dev.20260311.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "rolldown-vite": "7.3.1",
     "tsdown": "0.21.2",
     "typescript": "5.9.3",
     "vite": "npm:rolldown-vite@7.3.1",
-    "rolldown-vite": "7.3.1",
     "vitest": "4.1.0",
     "webpack": "5.105.4"
   },
