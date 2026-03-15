@@ -13,16 +13,7 @@ const tsdownConfig: UserConfig = defineConfig({
   dts: true,
   clean: true,
   deps: {
-    neverBundle: [
-      'react',
-      'react-dom/server',
-      '@babel/generator',
-      '@babel/traverse',
-      '@babel/types',
-      'oxc-parser',
-      'webpack',
-      'vite',
-    ],
+    neverBundle: ['react', 'react-dom/server', 'oxc-parser', 'webpack', 'vite'],
   },
 });
 

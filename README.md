@@ -189,7 +189,7 @@ module.exports = {
           {
             loader: require.resolve('react-icons-sprite/webpack/loader'),
           },
-          // put your ts/tsx loader after ours (e.g. babel-loader or ts-loader)
+          // put your ts/tsx loader after ours (e.g. swc-loader or ts-loader)
         ],
       },
     ],

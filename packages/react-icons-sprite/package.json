@@ -70,17 +70,14 @@
   },
   "devDependencies": {
     "@carbon/icons-react": "11.76.0",
-    "@types/babel__generator": "7.27.0",
-    "@types/babel__traverse": "7.28.0",
     "@types/node": "25.5.0",
     "@types/react-dom": "19.2.3",
     "@typescript/native-preview": "7.0.0-dev.20260311.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "rolldown-vite": "7.3.1",
     "tsdown": "0.21.2",
     "typescript": "5.9.3",
-    "vite": "npm:rolldown-vite@7.3.1",
+    "vite": "8.0.0",
     "vitest": "4.1.0",
     "webpack": "5.105.4"
   },

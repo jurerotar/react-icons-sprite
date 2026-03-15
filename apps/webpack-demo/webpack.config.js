@@ -10,13 +10,19 @@ export default {
         exclude: /node_modules/,
         use: [
           {
-            loader: 'babel-loader',
+            loader: 'swc-loader',
             options: {
-              presets: [
-                '@babel/preset-env',
-                ['@babel/preset-react', { runtime: 'automatic' }],
-                '@babel/preset-typescript',
-              ],
+              jsc: {
+                parser: {
+                  syntax: 'typescript',
+                  tsx: true,
+                },
+                transform: {
+                  react: {
+                    runtime: 'automatic',
+                  },
+                },
+              },
             },
           },
           {
