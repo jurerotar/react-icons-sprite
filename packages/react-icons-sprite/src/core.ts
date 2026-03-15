@@ -239,7 +239,7 @@ const fixIconSelfClosingSpacing = (
   outputCode: string,
   iconLocalName: string,
 ) => {
-  const re = new RegExp(`<${iconLocalName}([^>]*?)\/>`, 'g');
+  const re = new RegExp(`<${iconLocalName}([^>]*?)/>`, 'g');
   return outputCode.replace(re, (_match, attrs: string) => {
     const normalizedAttrs = attrs.replace(/\s+$/g, '');
     return `<${iconLocalName}${normalizedAttrs} />`;

@@ -50,6 +50,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "bench:transform": "vitest bench tests/transform.bench.ts",
     "dev": "tsdown --watch",
     "format": "biome format --write --no-errors-on-unmatched",
     "format:check": "biome format --no-errors-on-unmatched",
