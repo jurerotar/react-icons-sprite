@@ -28,6 +28,30 @@ describe('FontAwesome and MUI Integration', () => {
     expect(res.code).not.toContain('icon={faCoffee}');
   });
 
+  it('handles @hugeicons/react with HugeiconsIcon component', () => {
+    const code = `
+      import { HugeiconsIcon } from '@hugeicons/react';
+      import { Alert02Icon } from '@hugeicons/core-free-icons';
+      export const C = () => <HugeiconsIcon icon={Alert02Icon} className="huge" />;
+    `;
+
+    const seen: Array<[string, string]> = [];
+    const res = transformModule(
+      code,
+      'hugeicons-test.tsx',
+      (pack, exportName) => {
+        seen.push([pack, exportName]);
+      },
+    );
+
+    expect(res.anyReplacements).toBe(true);
+    expect(seen).toContainEqual(['@hugeicons/core-free-icons', 'Alert02Icon']);
+    expect(res.code).toContain(
+      `<${ICON_COMPONENT_NAME} iconId="ri-hugeicons-core-free-icons-Alert02Icon" className="huge" />`,
+    );
+    expect(res.code).not.toContain('icon={Alert02Icon}');
+  });
+
   it('handles MUI icons with subpaths', () => {
     const code = `
       import Alarm from '@mui/icons-material/Alarm';

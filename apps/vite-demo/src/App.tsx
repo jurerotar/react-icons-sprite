@@ -12,6 +12,8 @@ import { RiAlarmFill } from '@remixicon/react';
 import { BehancePlain } from 'devicons-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCoffee } from '@fortawesome/free-solid-svg-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Alert02Icon } from '@hugeicons/core-free-icons';
 import AlarmMui from '@mui/icons-material/Alarm';
 import { Add as CarbonAdd } from '@carbon/icons-react';
 
@@ -38,10 +40,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             react-icons/bi
           </h2>
-          <BiAlarm
-            size={32}
-            color="red"
-          />
+          <BiAlarm />
         </section>
 
         <section
@@ -55,10 +54,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             lucide-react
           </h2>
-          <ArrowBigDown
-            size={32}
-            color="blue"
-          />
+          <ArrowBigDown />
         </section>
 
         <section
@@ -106,7 +102,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             @tabler/icons-react
           </h2>
-          <IconAlertCircle size={32} />
+          <IconAlertCircle />
         </section>
 
         <section
@@ -120,7 +116,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             phosphor-react
           </h2>
-          <Alarm size={32} />
+          <Alarm />
         </section>
 
         <section
@@ -134,7 +130,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             @phosphor-icons/react
           </h2>
-          <AcornIcon size={32} />
+          <AcornIcon />
         </section>
 
         <section
@@ -148,7 +144,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             react-feather
           </h2>
-          <Bell size={32} />
+          <Bell />
         </section>
 
         <section
@@ -162,7 +158,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             react-bootstrap-icons
           </h2>
-          <BootstrapAlarm size={32} />
+          <BootstrapAlarm />
         </section>
 
         <section
@@ -176,7 +172,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             grommet-icons
           </h2>
-          <Add size="32px" />
+          <Add />
         </section>
 
         <section
@@ -190,7 +186,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             remixicon-react
           </h2>
-          <RiAlarmFill size={32} />
+          <RiAlarmFill />
         </section>
 
         <section
@@ -204,7 +200,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             @remixicon/react
           </h2>
-          <RiAlarmFill size={32} />
+          <RiAlarmFill />
         </section>
 
         <section
@@ -218,7 +214,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             devicons-react
           </h2>
-          <BehancePlain size={32} />
+          <BehancePlain />
         </section>
 
         <section
@@ -232,10 +228,21 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             @fortawesome/react-fontawesome
           </h2>
-          <FontAwesomeIcon
-            icon={faCoffee}
-            size="2x"
-          />
+          <FontAwesomeIcon icon={faCoffee} />
+        </section>
+
+        <section
+          style={{
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '16px',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
+            @hugeicons/react
+          </h2>
+          <HugeiconsIcon icon={Alert02Icon} />
         </section>
 
         <section
@@ -249,7 +256,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             @mui/icons-material
           </h2>
-          <AlarmMui fontSize="large" />
+          <AlarmMui />
         </section>
 
         <section
@@ -263,7 +270,7 @@ const App = () => {
           <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
             @carbon/icons-react
           </h2>
-          <CarbonAdd size={32} />
+          <CarbonAdd />
         </section>
       </div>
     </div>

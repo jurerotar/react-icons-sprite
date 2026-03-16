@@ -24,6 +24,8 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
   /^devicons-react$/, // Devicons React
   /^@fortawesome\/react-fontawesome$/, // Font Awesome
   /^@fortawesome\/[\w-]+-svg-icons$/, // Font Awesome (Pro or Free)
+  /^@hugeicons\/react$/, // Hugeicons React wrapper
+  /^@hugeicons(?:-pro)?\/[\w-]+$/, // Hugeicons icon packs
   /^@mui\/icons-material(?:\/.*)?$/, // MUI Icons
   /^@carbon\/icons-react$/, // Carbon Icons
 ];
@@ -359,8 +361,10 @@ export const transformModule = (
       }
 
       if (
-        meta.pack === '@fortawesome/react-fontawesome' &&
-        meta.exportName === 'FontAwesomeIcon' &&
+        ((meta.pack === '@fortawesome/react-fontawesome' &&
+          meta.exportName === 'FontAwesomeIcon') ||
+          (meta.pack === '@hugeicons/react' &&
+            meta.exportName === 'HugeiconsIcon')) &&
         iconAttr
       ) {
         const value = iconAttr.value as OxcNode | undefined;
@@ -540,6 +544,16 @@ interface FontAwesomeIconObject {
   icon: [number, number, string[], string, string | string[]];
 }
 
+interface HugeiconsIconObject {
+  viewBox?: string;
+  paths?: Array<{
+    d?: string;
+    opacity?: number;
+  }>;
+}
+
+type HugeiconsArrayIcon = Array<[string, Record<string, string | number>]>;
+
 type IconModule = Record<string, unknown>;
 
 const toKebab = (s: string) =>
@@ -645,6 +659,38 @@ export const renderOneIcon = async (pack: string, exportName: string) => {
     const viewBox = `0 0 ${width} ${height}`;
     const paths = Array.isArray(pathData) ? pathData : [pathData];
     const inner = paths.map((d: string) => `<path d="${d}" />`).join('');
+    const symbol = `<symbol id="${id}" viewBox="${viewBox}">${inner}</symbol>`;
+    return { id, symbol };
+  }
+
+  // Hugeicons exports icon objects consumed by HugeiconsIcon wrapper
+  if (/^@hugeicons(?:-pro)?\/[\w-]+$/.test(pack)) {
+    if (Array.isArray(Comp)) {
+      const hugeIcon = Comp as HugeiconsArrayIcon;
+      const inner = hugeIcon
+        .map(([tag, attrs]) => {
+          const attrString = Object.entries(attrs)
+            .map(([k, v]) => `${k}="${v}"`)
+            .join(' ');
+          return `<${tag} ${attrString} />`;
+        })
+        .join('');
+      const symbol = `<symbol id="${id}" viewBox="0 0 24 24">${inner}</symbol>`;
+      return { id, symbol };
+    }
+    const hugeIcon = Comp as HugeiconsIconObject;
+    const viewBox = hugeIcon.viewBox ?? '0 0 24 24';
+    const paths = Array.isArray(hugeIcon.paths) ? hugeIcon.paths : [];
+    const inner = paths
+      .map((p) => {
+        if (!p?.d) {
+          return '';
+        }
+        const opacityAttr =
+          typeof p.opacity === 'number' ? ` opacity="${p.opacity}"` : '';
+        return `<path d="${p.d}"${opacityAttr} />`;
+      })
+      .join('');
     const symbol = `<symbol id="${id}" viewBox="${viewBox}">${inner}</symbol>`;
     return { id, symbol };
   }

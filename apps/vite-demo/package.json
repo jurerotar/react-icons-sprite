@@ -11,6 +11,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview",
     "lint": "biome lint --write --no-errors-on-unmatched",
     "lint:check": "biome lint --no-errors-on-unmatched",
@@ -25,6 +26,8 @@
     "@fortawesome/free-solid-svg-icons": "7.2.0",
     "@fortawesome/react-fontawesome": "3.2.0",
     "@heroicons/react": "2.2.0",
+    "@hugeicons/core-free-icons": "4.0.0",
+    "@hugeicons/react": "1.1.6",
     "@mui/icons-material": "7.3.9",
     "@mui/material": "7.3.9",
     "@phosphor-icons/react": "2.1.10",

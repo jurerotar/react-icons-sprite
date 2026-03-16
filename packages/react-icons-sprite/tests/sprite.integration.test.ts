@@ -79,6 +79,11 @@ const testIcons: Array<{ pack: string; exportName: string; title: string }> = [
     pack: '@carbon/icons-react',
     exportName: 'Add',
   },
+  {
+    title: 'Hugeicons (Core Free)',
+    pack: '@hugeicons/core-free-icons',
+    exportName: 'Alert02Icon',
+  },
 ];
 
 describe('Sprite integration across icon sets', () => {
@@ -119,7 +124,11 @@ describe('Sprite integration across icon sets', () => {
 
     // These patterns are for components or meta-packages that don't directly export icons
     // in the same way, or are handled via the icon prop (like FontAwesomeIcon)
-    const knownNonIconPacks = [/^@fortawesome\/react-fontawesome$/];
+    const knownNonIconPacks = [
+      /^@fortawesome\/react-fontawesome$/,
+      /^@hugeicons\/react$/,
+      /^@hugeicons(?:-pro)?\/[\w-]+$/,
+    ];
 
     for (const icon of testIcons) {
       for (const pattern of patterns) {

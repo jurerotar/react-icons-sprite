@@ -25,6 +25,8 @@ Out of the box, imports from the following libraries are detected and transforme
 - `devicons-react`
 - `@fortawesome/free-solid-svg-icons` (and other Font Awesome icon packs)
 - `@fortawesome/react-fontawesome`
+- `@hugeicons/react`
+- `@hugeicons/*` and `@hugeicons-pro/*` icon packs
 - `@mui/icons-material`
 - `@carbon/icons-react`
 
