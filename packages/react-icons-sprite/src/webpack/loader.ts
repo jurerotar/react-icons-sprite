@@ -1,4 +1,4 @@
-import { transformModule } from '../core';
+import { transformModule } from '../transform/transform-module';
 import { collector } from '../collector';
 import type { LoaderDefinitionFunction } from 'webpack';
 

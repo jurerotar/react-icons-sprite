@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { buildSprite } from '../core';
+import { buildSprite } from '../sprite/build-sprite';
 import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 import { collector } from '../collector';
 import type { Compiler, Compilation } from 'webpack';

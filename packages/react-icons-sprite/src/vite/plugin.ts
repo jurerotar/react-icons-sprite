@@ -1,11 +1,9 @@
 import type { Plugin } from 'vite';
 import { createHash } from 'node:crypto';
-import {
-  createCollector,
-  transformModule,
-  buildSprite,
-  DEFAULT_ICON_SOURCES,
-} from '../core';
+import { createCollector } from '../collector/create-collector';
+import { DEFAULT_ICON_SOURCES } from '../packs/icon-resolvers';
+import { buildSprite } from '../sprite/build-sprite';
+import { transformModule } from '../transform/transform-module';
 import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 
 export type ReactIconsSpriteVitePluginOptions = {
@@ -51,7 +49,6 @@ export const reactIconsSprite = (
             collector.add(pack, exportName);
           },
           DEFAULT_ICON_SOURCES,
-          { sourceMap: true },
         );
         if (!anyReplacements) {
           return null;
