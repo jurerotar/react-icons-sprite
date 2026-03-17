@@ -11,9 +11,12 @@ const imports = [
 
 const usageBlock = Array.from({ length: 80 }, (_, i) => {
   const set = i % 3;
-  if (set === 0) return '<BiAlarm /><BiAdjust className="x" /><BiAnchorAlt />';
-  if (set === 1)
+  if (set === 0) {
+    return '<BiAlarm /><BiAdjust className="x" /><BiAnchorAlt />';
+  }
+  if (set === 1) {
     return '<MdHome /><MdSettings /><MdFavorite className="fav" />';
+  }
   return '<FiActivity /><FiAirplay /><FiAlertCircle />';
 }).join('\n          ');
 

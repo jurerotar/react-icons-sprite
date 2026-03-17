@@ -37,7 +37,9 @@ const walkAst = (
   node: unknown,
   visit: (current: Record<string, unknown>) => void,
 ): void => {
-  if (!isObject(node)) return;
+  if (!isObject(node)) {
+    return;
+  }
   visit(node);
 
   for (const value of Object.values(node)) {
@@ -59,17 +61,24 @@ const buildSymbolTable = (
   const body = (program.body as unknown[]) ?? [];
 
   for (const node of body) {
-    if (!isObject(node) || node.type !== 'ImportDeclaration') continue;
+    if (!isObject(node) || node.type !== 'ImportDeclaration') {
+      continue;
+    }
     const source = isObject(node.source) ? node.source : undefined;
     const pack = typeof source?.value === 'string' ? source.value : undefined;
-    if (!pack || !sources.some((sourceMatcher) => sourceMatcher.test(pack)))
+    if (!pack || !sources.some((sourceMatcher) => sourceMatcher.test(pack))) {
       continue;
+    }
 
     const specifiers = (node.specifiers as unknown[]) ?? [];
     for (const specifier of specifiers) {
-      if (!isObject(specifier) || !isObject(specifier.local)) continue;
+      if (!isObject(specifier) || !isObject(specifier.local)) {
+        continue;
+      }
       const localName = specifier.local.name;
-      if (typeof localName !== 'string') continue;
+      if (typeof localName !== 'string') {
+        continue;
+      }
 
       if (specifier.type === 'ImportSpecifier') {
         const imported = isObject(specifier.imported)
@@ -103,18 +112,31 @@ const detectIconUsage = (
   const usages: IconUsage[] = [];
 
   walkAst(program, (node) => {
-    if (node.type !== 'JSXOpeningElement' && node.type !== 'JSXClosingElement')
+    if (
+      node.type !== 'JSXOpeningElement' &&
+      node.type !== 'JSXClosingElement'
+    ) {
       return;
+    }
 
     const name = isObject(node.name) ? node.name : undefined;
-    if (!name || name.type !== 'JSXIdentifier' || typeof name.name !== 'string')
+    if (
+      !name ||
+      name.type !== 'JSXIdentifier' ||
+      typeof name.name !== 'string'
+    ) {
       return;
+    }
 
     const symbol = symbols.get(name.name);
-    if (!symbol) return;
+    if (!symbol) {
+      return;
+    }
 
     const range = name.range as NodeRange | undefined;
-    if (!range || range.length !== 2) return;
+    if (!range || range.length !== 2) {
+      return;
+    }
 
     usages.push({
       local: name.name,
@@ -135,9 +157,13 @@ const detectFontAwesomeComponents = (
   const body = (program.body as unknown[]) ?? [];
 
   for (const node of body) {
-    if (!isObject(node) || node.type !== 'ImportDeclaration') continue;
+    if (!isObject(node) || node.type !== 'ImportDeclaration') {
+      continue;
+    }
     const source = isObject(node.source) ? node.source : undefined;
-    if (source?.value !== FONTAWESOME_REACT_PACK) continue;
+    if (source?.value !== FONTAWESOME_REACT_PACK) {
+      continue;
+    }
 
     const specifiers = (node.specifiers as unknown[]) ?? [];
     for (const specifier of specifiers) {
@@ -209,7 +235,9 @@ const detectFontAwesomeIconUsages = (
 
     const attributes = (node.attributes as unknown[]) ?? [];
     for (const attribute of attributes) {
-      if (!isObject(attribute) || attribute.type !== 'JSXAttribute') continue;
+      if (!isObject(attribute) || attribute.type !== 'JSXAttribute') {
+        continue;
+      }
 
       const attributeName = isObject(attribute.name)
         ? attribute.name
@@ -223,7 +251,9 @@ const detectFontAwesomeIconUsages = (
       }
 
       const value = isObject(attribute.value) ? attribute.value : undefined;
-      if (!value || value.type !== 'JSXExpressionContainer') continue;
+      if (!value || value.type !== 'JSXExpressionContainer') {
+        continue;
+      }
 
       const expression = isObject(value.expression)
         ? value.expression
@@ -237,7 +267,9 @@ const detectFontAwesomeIconUsages = (
       }
 
       const symbol = symbols.get(expression.name);
-      if (!symbol || !isFontAwesomeIconPack(symbol.pack)) continue;
+      if (!symbol || !isFontAwesomeIconPack(symbol.pack)) {
+        continue;
+      }
 
       const iconAttributeRange = attribute.range as NodeRange | undefined;
       if (!iconAttributeRange || iconAttributeRange.length !== 2) {
@@ -267,13 +299,17 @@ const cleanupImports = (
   const body = (program.body as unknown[]) ?? [];
 
   for (const node of body) {
-    if (!isObject(node) || node.type !== 'ImportDeclaration') continue;
+    if (!isObject(node) || node.type !== 'ImportDeclaration') {
+      continue;
+    }
     const specifiers = (node.specifiers as unknown[]) ?? [];
     const declarationRange = node.range as NodeRange | undefined;
 
     let hasUsedIconSpecifier = false;
     for (const specifier of specifiers) {
-      if (!isObject(specifier) || !isObject(specifier.local)) continue;
+      if (!isObject(specifier) || !isObject(specifier.local)) {
+        continue;
+      }
       const localName = specifier.local.name;
       if (
         typeof localName === 'string' &&
