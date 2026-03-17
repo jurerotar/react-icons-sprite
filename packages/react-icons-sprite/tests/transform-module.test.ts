@@ -62,6 +62,19 @@ describe('transformModule', () => {
     expect(used).toEqual([]);
   });
 
+  test('ignores FontAwesomeIcon with string icon prop in JSX expression', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";\nexport const A = () => <FontAwesomeIcon icon={"coffee"} />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(false);
+    expect(result.code).toContain('icon={"coffee"}');
+    expect(used).toEqual([]);
+  });
+
   test('rewrites aliased icon component usages and deduplicates registration', () => {
     const used: Array<{ pack: string; exportName: string }> = [];
     const input = `import { Circle as Ring } from "lucide-react";\nexport const A = () => <><Ring /><Ring></Ring></>;`;

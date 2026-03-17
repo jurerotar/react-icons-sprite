@@ -25,18 +25,12 @@ const App = () => {
       <div className="icon-grid">
         <section className="icon-card">
           <h2 className="icon-title">react-icons/bi</h2>
-          <BiAlarm
-            size={32}
-            color="red"
-          />
+          <BiAlarm size={32} />
         </section>
 
         <section className="icon-card">
           <h2 className="icon-title">lucide-react</h2>
-          <ArrowBigDown
-            size={32}
-            color="blue"
-          />
+          <ArrowBigDown size={32} />
         </section>
 
         <section className="icon-card">
