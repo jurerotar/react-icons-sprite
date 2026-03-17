@@ -2,6 +2,7 @@ import { BiAlarm } from 'react-icons/bi';
 import { ArrowBigDown } from 'lucide-react';
 import { SunIcon } from '@radix-ui/react-icons';
 import { BellIcon } from '@heroicons/react/24/outline';
+import HeroiconBellDefault from '@heroicons/react/24/outline/BellIcon';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { Alarm } from 'phosphor-react';
 import { AcornIcon } from '@phosphor-icons/react';
@@ -13,6 +14,7 @@ import { BehancePlain } from 'devicons-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCoffee } from '@fortawesome/free-solid-svg-icons';
 import AlarmMui from '@mui/icons-material/Alarm';
+import { Alarm as AlarmMuiNamed } from '@mui/icons-material';
 import { Add as CarbonAdd } from '@carbon/icons-react';
 
 const App = () => {
@@ -48,6 +50,16 @@ const App = () => {
         <section className="icon-card">
           <h2 className="icon-title">@heroicons/react</h2>
           <BellIcon
+            width={32}
+            height={32}
+          />
+        </section>
+
+        <section className="icon-card">
+          <h2 className="icon-title">
+            @heroicons/react (default subpath import)
+          </h2>
+          <HeroiconBellDefault
             width={32}
             height={32}
           />
@@ -109,6 +121,13 @@ const App = () => {
         <section className="icon-card">
           <h2 className="icon-title">@mui/icons-material</h2>
           <AlarmMui fontSize="large" />
+        </section>
+
+        <section className="icon-card">
+          <h2 className="icon-title">
+            @mui/icons-material (named root import)
+          </h2>
+          <AlarmMuiNamed fontSize="large" />
         </section>
 
         <section className="icon-card">
