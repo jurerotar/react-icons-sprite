@@ -11,8 +11,11 @@ export const buildSprite = async (icons: CollectedIcon[]): Promise<string> => {
     icons.map(async ({ pack, exportName }) => {
       const rendered = await renderIcon(pack, exportName);
       const id = computeIconId(pack, exportName);
+      const symbolAttributes = rendered.symbolAttributes
+        ? ` ${rendered.symbolAttributes}`
+        : '';
 
-      return `<symbol id="${id}" viewBox="${rendered.viewBox}">${rendered.symbolBody}</symbol>`;
+      return `<symbol id="${id}" viewBox="${rendered.viewBox}"${symbolAttributes}>${rendered.symbolBody}</symbol>`;
     }),
   );
 

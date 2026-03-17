@@ -5,6 +5,7 @@ import { buildEdits, type EditOperation, type IconUsage } from './edit-builder';
 import { fastFilter } from './fast-filter';
 import { scanIconImports } from './import-scanner';
 import { detectUsage } from './usage-scanner';
+import { computeIconId } from '../utils/compute-icon-id';
 
 export const ICON_SOURCE = 'react-icons-sprite';
 export const ICON_COMPONENT_NAME = 'ReactIconsSpriteIcon';
@@ -14,6 +15,12 @@ type NodeRange = [number, number];
 type IconSymbol = {
   pack: string;
   exportName: string;
+};
+
+const FONTAWESOME_REACT_PACK = '@fortawesome/react-fontawesome';
+
+const isFontAwesomeIconPack = (pack: string): boolean => {
+  return /^@fortawesome\/[\w-]+-svg-icons$/.test(pack);
 };
 
 type TransformResult = {
@@ -121,6 +128,136 @@ const detectIconUsage = (
   return usages;
 };
 
+const detectFontAwesomeComponents = (
+  program: Record<string, unknown>,
+): Set<string> => {
+  const componentLocals = new Set<string>();
+  const body = (program.body as unknown[]) ?? [];
+
+  for (const node of body) {
+    if (!isObject(node) || node.type !== 'ImportDeclaration') continue;
+    const source = isObject(node.source) ? node.source : undefined;
+    if (source?.value !== FONTAWESOME_REACT_PACK) continue;
+
+    const specifiers = (node.specifiers as unknown[]) ?? [];
+    for (const specifier of specifiers) {
+      if (
+        !isObject(specifier) ||
+        specifier.type !== 'ImportSpecifier' ||
+        !isObject(specifier.local) ||
+        !isObject(specifier.imported)
+      ) {
+        continue;
+      }
+
+      const importedName =
+        typeof specifier.imported.name === 'string'
+          ? specifier.imported.name
+          : undefined;
+      const localName =
+        typeof specifier.local.name === 'string'
+          ? specifier.local.name
+          : undefined;
+
+      if (importedName === 'FontAwesomeIcon' && localName) {
+        componentLocals.add(localName);
+      }
+    }
+  }
+
+  return componentLocals;
+};
+
+type FontAwesomeIconUsage = {
+  componentRange: NodeRange;
+  iconAttributeRange: NodeRange;
+  iconLocal: string;
+  pack: string;
+  exportName: string;
+};
+
+const detectFontAwesomeIconUsages = (
+  program: Record<string, unknown>,
+  symbols: Map<string, IconSymbol>,
+  fontAwesomeComponentLocals: Set<string>,
+): FontAwesomeIconUsage[] => {
+  if (!fontAwesomeComponentLocals.size) {
+    return [];
+  }
+
+  const usages: FontAwesomeIconUsage[] = [];
+
+  walkAst(program, (node) => {
+    if (node.type !== 'JSXOpeningElement') {
+      return;
+    }
+
+    const name = isObject(node.name) ? node.name : undefined;
+    if (
+      !name ||
+      name.type !== 'JSXIdentifier' ||
+      typeof name.name !== 'string' ||
+      !fontAwesomeComponentLocals.has(name.name)
+    ) {
+      return;
+    }
+
+    const componentRange = name.range as NodeRange | undefined;
+    if (!componentRange || componentRange.length !== 2) {
+      return;
+    }
+
+    const attributes = (node.attributes as unknown[]) ?? [];
+    for (const attribute of attributes) {
+      if (!isObject(attribute) || attribute.type !== 'JSXAttribute') continue;
+
+      const attributeName = isObject(attribute.name)
+        ? attribute.name
+        : undefined;
+      if (
+        !attributeName ||
+        attributeName.type !== 'JSXIdentifier' ||
+        attributeName.name !== 'icon'
+      ) {
+        continue;
+      }
+
+      const value = isObject(attribute.value) ? attribute.value : undefined;
+      if (!value || value.type !== 'JSXExpressionContainer') continue;
+
+      const expression = isObject(value.expression)
+        ? value.expression
+        : undefined;
+      if (
+        !expression ||
+        expression.type !== 'Identifier' ||
+        typeof expression.name !== 'string'
+      ) {
+        continue;
+      }
+
+      const symbol = symbols.get(expression.name);
+      if (!symbol || !isFontAwesomeIconPack(symbol.pack)) continue;
+
+      const iconAttributeRange = attribute.range as NodeRange | undefined;
+      if (!iconAttributeRange || iconAttributeRange.length !== 2) {
+        continue;
+      }
+
+      usages.push({
+        componentRange,
+        iconAttributeRange,
+        iconLocal: expression.name,
+        pack: symbol.pack,
+        exportName: symbol.exportName,
+      });
+      break;
+    }
+  });
+
+  return usages;
+};
+
 const cleanupImports = (
   program: Record<string, unknown>,
   symbols: Map<string, IconSymbol>,
@@ -176,7 +313,12 @@ export const transformModule = (
   }
 
   const names = scanned.flatMap((item) => item.names);
-  if (!detectUsage(code, names)) {
+  const hasJsxComponentUsage = detectUsage(code, names);
+  const hasPotentialFontAwesomeUsage =
+    code.includes(FONTAWESOME_REACT_PACK) &&
+    scanned.some((item) => isFontAwesomeIconPack(item.pack));
+
+  if (!hasJsxComponentUsage && !hasPotentialFontAwesomeUsage) {
     return { code, map: null, anyReplacements: false };
   }
 
@@ -193,12 +335,47 @@ export const transformModule = (
   }
 
   const usages = detectIconUsage(program, table);
-  if (!usages.length) {
+  const fontAwesomeComponentLocals = detectFontAwesomeComponents(program);
+  const fontAwesomeUsages = detectFontAwesomeIconUsages(
+    program,
+    table,
+    fontAwesomeComponentLocals,
+  );
+
+  if (!usages.length && !fontAwesomeUsages.length) {
     return { code, map: null, anyReplacements: false };
   }
 
   const used = new Set<string>();
   const edits = buildEdits(usages, ICON_COMPONENT_NAME, used, register);
+  const registeredFontAwesomeIcons = new Set<string>();
+
+  for (const usage of fontAwesomeUsages) {
+    edits.push({
+      type: 'replace',
+      from: usage.componentRange[0],
+      to: usage.componentRange[1],
+      value: ICON_COMPONENT_NAME,
+    });
+    edits.push({
+      type: 'insert',
+      pos: usage.componentRange[1],
+      value: ` iconId="${computeIconId(usage.pack, usage.exportName)}"`,
+    });
+    edits.push({
+      type: 'remove',
+      from: usage.iconAttributeRange[0],
+      to: usage.iconAttributeRange[1],
+    });
+
+    used.add(usage.iconLocal);
+    const key = `${usage.pack}:${usage.exportName}`;
+    if (!registeredFontAwesomeIcons.has(key)) {
+      registeredFontAwesomeIcons.add(key);
+      register(usage.pack, usage.exportName);
+    }
+  }
+
   const cleanupEdits = cleanupImports(program, table, used);
 
   const magicString = applyEdits(code, [...edits, ...cleanupEdits]);

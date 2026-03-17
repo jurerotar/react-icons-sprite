@@ -2,6 +2,7 @@ import { kebabCase } from '../utils/kebab-case';
 
 export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
   /^react-icons\/[\w-]+$/,
+  /^@fortawesome\/[\w-]+-svg-icons$/,
   /^lucide-react$/,
   /^@heroicons\/react(?:\/.*)?$/,
   /^@tabler\/icons-react$/,
@@ -13,7 +14,6 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
   /^grommet-icons$/,
   /^@remixicon\/react$/,
   /^devicons-react$/,
-  /^@fortawesome\/.+$/,
   /^@mui\/icons-material(?:\/.*)?$/,
   /^@carbon\/icons-react$/,
 ];
