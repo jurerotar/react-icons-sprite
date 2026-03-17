@@ -17,255 +17,134 @@ import { Add as CarbonAdd } from '@carbon/icons-react';
 
 const App = () => {
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1 style={{ textAlign: 'center' }}>React Icons Sprite - Rsbuild Demo</h1>
+    <div className="app">
+      <h1 className="app-title">React Icons Sprite - Rsbuild Demo</h1>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '20px',
-        }}
-      >
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            react-icons/bi
-          </h2>
+      <div className="icon-grid">
+        <section className="icon-card">
+          <h2 className="icon-title">react-icons/bi</h2>
           <BiAlarm
             size={32}
             color="red"
           />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            lucide-react
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">lucide-react</h2>
           <ArrowBigDown
             size={32}
             color="blue"
           />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            @radix-ui/react-icons
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">@radix-ui/react-icons</h2>
           <SunIcon
             width={32}
             height={32}
           />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            @heroicons/react
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">@heroicons/react</h2>
           <BellIcon
             width={32}
             height={32}
           />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            @tabler/icons-react
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">@tabler/icons-react</h2>
           <IconAlertCircle size={32} />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            phosphor-react
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">phosphor-react</h2>
           <Alarm size={32} />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            @phosphor-icons/react
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">@phosphor-icons/react</h2>
           <AcornIcon size={32} />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            react-feather
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">react-feather</h2>
           <Bell size={32} />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            react-bootstrap-icons
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">react-bootstrap-icons</h2>
           <BootstrapAlarm size={32} />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            grommet-icons
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">grommet-icons</h2>
           <Add size="32px" />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            remixicon-react
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">remixicon-react</h2>
           <RiAlarmFill size={32} />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            @remixicon/react
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">@remixicon/react</h2>
           <RiAlarmFill size={32} />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            devicons-react
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">devicons-react</h2>
           <BehancePlain size={32} />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            @fortawesome/react-fontawesome
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">@fortawesome/react-fontawesome</h2>
           <FontAwesomeIcon
             icon={faCoffee}
             size="2x"
           />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            @mui/icons-material
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">@mui/icons-material</h2>
           <AlarmMui fontSize="large" />
         </section>
 
-        <section
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '8px',
-            padding: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ fontSize: '14px', marginBottom: '10px' }}>
-            @carbon/icons-react
-          </h2>
+        <section className="icon-card">
+          <h2 className="icon-title">@carbon/icons-react</h2>
           <CarbonAdd size={32} />
         </section>
       </div>
+
+      <style>{`
+        .app {
+          padding: 20px;
+          font-family: sans-serif;
+        }
+
+        .app-title {
+          text-align: center;
+        }
+
+        .icon-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 20px;
+        }
+
+        .icon-card {
+          border: 1px solid #ccc;
+          border-radius: 8px;
+          padding: 16px;
+          text-align: center;
+        }
+
+        .icon-title {
+          font-size: 14px;
+          margin-bottom: 10px;
+        }
+      `}</style>
     </div>
   );
 };
