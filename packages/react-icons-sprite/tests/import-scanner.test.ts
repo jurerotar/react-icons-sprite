@@ -33,6 +33,29 @@ describe('scanIconImports', () => {
     expect(scanIconImports(code, DEFAULT_ICON_SOURCES)).toEqual([]);
   });
 
+  test('ignores type-only imports from supported packs', () => {
+    const code = `
+      import type { Circle } from "lucide-react";
+      import { type Square, Triangle } from "lucide-react";
+    `;
+
+    expect(scanIconImports(code, DEFAULT_ICON_SOURCES)).toEqual([
+      { pack: 'lucide-react', names: ['Triangle'] },
+    ]);
+  });
+
+  test('supports custom global regex sources without lastIndex misses', () => {
+    const code = `
+      import { Circle } from "lucide-react";
+      import { Square } from "lucide-react";
+    `;
+
+    expect(scanIconImports(code, [/^lucide-react$/g])).toEqual([
+      { pack: 'lucide-react', names: ['Circle'] },
+      { pack: 'lucide-react', names: ['Square'] },
+    ]);
+  });
+
   test('ignores imports from unsupported packs', () => {
     const code = `
       import { Circle } from "./icons";

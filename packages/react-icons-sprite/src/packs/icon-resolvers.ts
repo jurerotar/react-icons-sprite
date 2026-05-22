@@ -20,13 +20,36 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
 
 type ImportResolver = (pack: string, exportName: string) => string;
 
-const resolvers: Record<string, ImportResolver> = {
-  'lucide-react': (_pack, name) =>
-    `lucide-react/dist/esm/icons/${kebabCase(name)}.js`,
-  '@tabler/icons-react': (_pack, name) =>
-    `@tabler/icons-react/dist/esm/icons/${name}.mjs`,
+const exactResolvers: Record<string, ImportResolver> = {
+  'lucide-react': (pack, name) =>
+    `${pack}/dist/esm/icons/${kebabCase(name)}.js`,
+  '@radix-ui/react-icons': (pack, name) => `${pack}/${name}`,
+  '@tabler/icons-react': (pack, name) => `${pack}/dist/esm/icons/${name}.mjs`,
+  '@phosphor-icons/react': (pack, name) => `${pack}/dist/ssr/${name}.es.js`,
+  'phosphor-react': (pack, name) => `${pack}/dist/icons/${name}.esm.js`,
+  'react-feather': (pack, name) => `${pack}/dist/icons/${kebabCase(name)}`,
+  'react-bootstrap-icons': (pack, name) =>
+    `${pack}/dist/icons/${kebabCase(name)}`,
+  '@carbon/icons-react': (pack, name) => `${pack}/lib/${name}.js`,
 };
 
 export const resolveIconImport = (pack: string, exportName: string): string => {
-  return resolvers[pack]?.(pack, exportName) ?? pack;
+  const exactResolver = exactResolvers[pack];
+  if (exactResolver) {
+    return exactResolver(pack, exportName);
+  }
+
+  if (/^@mui\/icons-material(?:\/.*)?$/.test(pack)) {
+    return pack.split('/').length > 2 ? pack : `${pack}/${exportName}`;
+  }
+
+  if (/^@heroicons\/react\/(?:\d{2})\/(?:outline|solid)$/.test(pack)) {
+    return `${pack}/${exportName}`;
+  }
+
+  if (/^@fortawesome\/[\w-]+-svg-icons$/.test(pack)) {
+    return `${pack}/${exportName}`;
+  }
+
+  return pack;
 };

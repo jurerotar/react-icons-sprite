@@ -11,6 +11,7 @@ export type IconUsage = {
   pack: string;
   exportName: string;
   kind: 'opening' | 'closing';
+  hasIconId?: boolean;
 };
 
 export const buildEdits = (
@@ -20,6 +21,7 @@ export const buildEdits = (
   register: (pack: string, exportName: string) => void,
 ): EditOperation[] => {
   const edits: EditOperation[] = [];
+  const iconIdCache = new Map<string, string>();
 
   for (const usage of usages) {
     edits.push({
@@ -30,11 +32,20 @@ export const buildEdits = (
     });
 
     if (usage.kind === 'opening') {
-      edits.push({
-        type: 'insert',
-        pos: usage.range[1],
-        value: ` iconId="${computeIconId(usage.pack, usage.exportName)}"`,
-      });
+      if (!usage.hasIconId) {
+        const key = `${usage.pack}:${usage.exportName}`;
+        let iconId = iconIdCache.get(key);
+        if (!iconId) {
+          iconId = computeIconId(usage.pack, usage.exportName);
+          iconIdCache.set(key, iconId);
+        }
+
+        edits.push({
+          type: 'insert',
+          pos: usage.range[1],
+          value: ` iconId="${iconId}"`,
+        });
+      }
       usedSymbols.add(usage.local);
       register(usage.pack, usage.exportName);
     }
