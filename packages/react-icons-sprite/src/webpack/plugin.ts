@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { buildSprite } from '../core';
+import { buildSprite } from '../sprite/build-sprite';
 import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 import { collector } from '../collector';
 import type { Compiler, Compilation } from 'webpack';
@@ -41,7 +41,9 @@ export class ReactIconsSpriteWebpackPlugin {
         compilation.hooks.processAssets.tapPromise(
           { name: pluginName, stage },
           async () => {
-            const spriteXml = await buildSprite(collector.toList());
+            const spriteXml = await buildSprite(collector.toList(), {
+              baseDir: compiler.context,
+            });
 
             const generatedHash = createHash('sha256')
               .update(spriteXml)

@@ -1,4 +1,4 @@
-import { createCollector } from './core';
+import { createCollector } from './collector/create-collector';
 
 // Shared singleton collector used by integrations that cannot share state easily
 // (e.g., Webpack loader <-> plugin communication during a single build).

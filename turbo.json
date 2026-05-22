@@ -7,7 +7,7 @@
       "cache": false
     },
     "preview": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build", "^build"],
       "cache": false
     },
     "lint": {},

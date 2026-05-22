@@ -1,11 +1,9 @@
 import type { Plugin } from 'vite';
 import { createHash } from 'node:crypto';
-import {
-  createCollector,
-  transformModule,
-  buildSprite,
-  DEFAULT_ICON_SOURCES,
-} from '../core';
+import { createCollector } from '../collector/create-collector';
+import { DEFAULT_ICON_SOURCES } from '../packs/icon-resolvers';
+import { buildSprite } from '../sprite/build-sprite';
+import { transformModule } from '../transform/transform-module';
 import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 
 export type ReactIconsSpriteVitePluginOptions = {
@@ -23,6 +21,7 @@ export const reactIconsSprite = (
   const { fileName } = options;
 
   const collector = createCollector();
+  let root = process.cwd();
 
   return {
     name: 'vite-plugin-react-icons-sprite',
@@ -31,6 +30,10 @@ export const reactIconsSprite = (
 
     buildStart() {
       collector.clear();
+    },
+
+    configResolved(config) {
+      root = config.root;
     },
 
     transform(code, id) {
@@ -51,7 +54,6 @@ export const reactIconsSprite = (
             collector.add(pack, exportName);
           },
           DEFAULT_ICON_SOURCES,
-          { sourceMap: true },
         );
         if (!anyReplacements) {
           return null;
@@ -68,7 +70,9 @@ export const reactIconsSprite = (
     },
 
     async generateBundle(this, _options, bundle) {
-      const spriteXml = await buildSprite(collector.toList());
+      const spriteXml = await buildSprite(collector.toList(), {
+        baseDir: root,
+      });
 
       const generatedHash = createHash('sha256')
         .update(spriteXml)
