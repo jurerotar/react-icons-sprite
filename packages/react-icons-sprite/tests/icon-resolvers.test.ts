@@ -4,7 +4,7 @@ import { resolveIconImport } from '../src/packs/icon-resolvers';
 describe('resolveIconImport', () => {
   test('resolves lucide-react icons to concrete ESM file path', () => {
     expect(resolveIconImport('lucide-react', 'ArrowBigDown')).toBe(
-      'lucide-react/dist/esm/icons/arrow-big-down.js',
+      'lucide-react/dist/esm/icons/arrow-big-down.mjs',
     );
   });
 
@@ -28,7 +28,7 @@ describe('resolveIconImport', () => {
       '@mui/icons-material/Alarm',
     );
     expect(resolveIconImport('@radix-ui/react-icons', 'SunIcon')).toBe(
-      '@radix-ui/react-icons/SunIcon',
+      '@radix-ui/react-icons/dist/react-icons.esm.js',
     );
     expect(resolveIconImport('@heroicons/react/24/outline', 'BellIcon')).toBe(
       '@heroicons/react/24/outline/BellIcon',
@@ -37,25 +37,34 @@ describe('resolveIconImport', () => {
       resolveIconImport('@fortawesome/free-solid-svg-icons', 'faUser'),
     ).toBe('@fortawesome/free-solid-svg-icons/faUser');
     expect(resolveIconImport('@phosphor-icons/react', 'Alarm')).toBe(
-      '@phosphor-icons/react/dist/ssr/Alarm.es.js',
+      '@phosphor-icons/react/dist/ssr/Alarm',
+    );
+    expect(resolveIconImport('@phosphor-icons/react', 'AcornIcon')).toBe(
+      '@phosphor-icons/react/dist/ssr/Acorn',
     );
     expect(resolveIconImport('phosphor-react', 'Alarm')).toBe(
       'phosphor-react/dist/icons/Alarm.esm.js',
     );
     expect(resolveIconImport('react-feather', 'AlertCircle')).toBe(
-      'react-feather/dist/icons/alert-circle',
+      'react-feather/dist/icons/alert-circle.js',
     );
     expect(resolveIconImport('react-bootstrap-icons', 'AlarmFill')).toBe(
-      'react-bootstrap-icons/dist/icons/alarm-fill',
+      'react-bootstrap-icons/dist/icons/alarm-fill.js',
+    );
+    expect(resolveIconImport('grommet-icons', 'Add')).toBe(
+      'grommet-icons/icons/Add.js',
+    );
+    expect(resolveIconImport('devicons-react', 'ReactOriginal')).toBe(
+      'devicons-react/icons/ReactOriginal',
     );
     expect(resolveIconImport('@carbon/icons-react', 'Add')).toBe(
-      '@carbon/icons-react/lib/Add.js',
+      '@carbon/icons-react/es/Add.js',
     );
   });
 
   test('supports kebab-case conversion for acronym and numeric lucide names', () => {
     expect(resolveIconImport('lucide-react', 'CPU3D')).toBe(
-      'lucide-react/dist/esm/icons/cpu3-d.js',
+      'lucide-react/dist/esm/icons/cpu3-d.mjs',
     );
   });
 });

@@ -20,17 +20,23 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
 
 type ImportResolver = (pack: string, exportName: string) => string;
 
+const phosphorIconPathName = (name: string): string =>
+  name.endsWith('Icon') ? name.slice(0, -4) : name;
+
 const exactResolvers: Record<string, ImportResolver> = {
   'lucide-react': (pack, name) =>
-    `${pack}/dist/esm/icons/${kebabCase(name)}.js`,
-  '@radix-ui/react-icons': (pack, name) => `${pack}/${name}`,
+    `${pack}/dist/esm/icons/${kebabCase(name)}.mjs`,
+  '@radix-ui/react-icons': (pack) => `${pack}/dist/react-icons.esm.js`,
   '@tabler/icons-react': (pack, name) => `${pack}/dist/esm/icons/${name}.mjs`,
-  '@phosphor-icons/react': (pack, name) => `${pack}/dist/ssr/${name}.es.js`,
+  '@phosphor-icons/react': (pack, name) =>
+    `${pack}/dist/ssr/${phosphorIconPathName(name)}`,
   'phosphor-react': (pack, name) => `${pack}/dist/icons/${name}.esm.js`,
-  'react-feather': (pack, name) => `${pack}/dist/icons/${kebabCase(name)}`,
   'react-bootstrap-icons': (pack, name) =>
-    `${pack}/dist/icons/${kebabCase(name)}`,
-  '@carbon/icons-react': (pack, name) => `${pack}/lib/${name}.js`,
+    `${pack}/dist/icons/${kebabCase(name)}.js`,
+  'react-feather': (pack, name) => `${pack}/dist/icons/${kebabCase(name)}.js`,
+  'grommet-icons': (pack, name) => `${pack}/icons/${name}.js`,
+  'devicons-react': (pack, name) => `${pack}/icons/${name}`,
+  '@carbon/icons-react': (pack, name) => `${pack}/es/${name}.js`,
 };
 
 export const resolveIconImport = (pack: string, exportName: string): string => {

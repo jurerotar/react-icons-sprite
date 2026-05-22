@@ -41,7 +41,9 @@ export class ReactIconsSpriteWebpackPlugin {
         compilation.hooks.processAssets.tapPromise(
           { name: pluginName, stage },
           async () => {
-            const spriteXml = await buildSprite(collector.toList());
+            const spriteXml = await buildSprite(collector.toList(), {
+              baseDir: compiler.context,
+            });
 
             const generatedHash = createHash('sha256')
               .update(spriteXml)

@@ -21,6 +21,7 @@ export const reactIconsSprite = (
   const { fileName } = options;
 
   const collector = createCollector();
+  let root = process.cwd();
 
   return {
     name: 'vite-plugin-react-icons-sprite',
@@ -29,6 +30,10 @@ export const reactIconsSprite = (
 
     buildStart() {
       collector.clear();
+    },
+
+    configResolved(config) {
+      root = config.root;
     },
 
     transform(code, id) {
@@ -65,7 +70,9 @@ export const reactIconsSprite = (
     },
 
     async generateBundle(this, _options, bundle) {
-      const spriteXml = await buildSprite(collector.toList());
+      const spriteXml = await buildSprite(collector.toList(), {
+        baseDir: root,
+      });
 
       const generatedHash = createHash('sha256')
         .update(spriteXml)
