@@ -21,3 +21,53 @@ export const applyEdits = (
 
   return magicString;
 };
+
+const editStart = (edit: EditOperation): number => {
+  return edit.type === 'insert' ? edit.pos : edit.from;
+};
+
+export const applyEditsToString = (
+  code: string,
+  edits: EditOperation[],
+): string => {
+  if (!edits.length) {
+    return code;
+  }
+
+  const orderedEdits = [...edits].sort((left, right) => {
+    const startDelta = editStart(left) - editStart(right);
+    if (startDelta !== 0) {
+      return startDelta;
+    }
+    if (left.type === 'insert' && right.type !== 'insert') {
+      return 1;
+    }
+    if (left.type !== 'insert' && right.type === 'insert') {
+      return -1;
+    }
+    return 0;
+  });
+
+  let result = '';
+  let cursor = 0;
+
+  for (const edit of orderedEdits) {
+    if (edit.type === 'insert') {
+      if (edit.pos <= cursor) {
+        result += edit.value;
+        continue;
+      }
+      result += code.slice(cursor, edit.pos) + edit.value;
+      cursor = edit.pos;
+      continue;
+    }
+
+    result += code.slice(cursor, edit.from);
+    if (edit.type === 'replace') {
+      result += edit.value;
+    }
+    cursor = edit.to;
+  }
+
+  return result + code.slice(cursor);
+};

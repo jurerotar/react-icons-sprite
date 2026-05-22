@@ -1,9 +1,9 @@
 import type { SourceMap } from 'magic-string';
 import { DEFAULT_ICON_SOURCES } from '../packs/icon-resolvers';
-import { applyEdits } from './edit-applier';
+import { computeIconId } from '../utils/compute-icon-id';
+import { applyEdits, applyEditsToString } from './edit-applier';
 import { buildEdits, type EditOperation, type IconUsage } from './edit-builder';
 import { fastFilter } from './fast-filter';
-import { computeIconId } from '../utils/compute-icon-id';
 
 export const ICON_SOURCE = 'react-icons-sprite';
 export const ICON_COMPONENT_NAME = 'ReactIconsSpriteIcon';
@@ -603,9 +603,20 @@ export const transformModule = (
   );
 
   const allEdits = [...edits, ...cleanupEdits, ...cleanupFontAwesomeEdits];
+  const importPrefix = `import { ${ICON_COMPONENT_NAME} } from "${ICON_SOURCE}";\n`;
+
+  if (!sourceMap) {
+    return {
+      code: `${spriteIconImport.hasImport ? '' : importPrefix}${applyEditsToString(
+        code,
+        allEdits,
+      )}`,
+      map: null,
+      anyReplacements: true,
+    };
+  }
 
   const magicString = applyEdits(code, allEdits);
-  const importPrefix = `import { ${ICON_COMPONENT_NAME} } from "${ICON_SOURCE}";\n`;
   if (!spriteIconImport.hasImport) {
     magicString.prepend(importPrefix);
   }
