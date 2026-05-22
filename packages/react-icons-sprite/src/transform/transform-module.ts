@@ -231,6 +231,33 @@ const escapeRegExp = (value: string): string => {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
+const isIdentifierStart = (char: string | undefined): boolean => {
+  return (
+    char !== undefined &&
+    ((char >= 'A' && char <= 'Z') ||
+      (char >= 'a' && char <= 'z') ||
+      char === '_' ||
+      char === '$')
+  );
+};
+
+const isIdentifierPart = (char: string | undefined): boolean => {
+  return (
+    char !== undefined &&
+    (isIdentifierStart(char) || (char >= '0' && char <= '9'))
+  );
+};
+
+const isWhitespace = (char: string | undefined): boolean => {
+  return (
+    char === ' ' ||
+    char === '\t' ||
+    char === '\n' ||
+    char === '\r' ||
+    char === '\f'
+  );
+};
+
 const scanJsxIconUsages = (
   code: string,
   symbols: Map<string, IconSymbol>,
@@ -239,30 +266,52 @@ const scanJsxIconUsages = (
     return [];
   }
 
-  const names = [...symbols.keys()].map(escapeRegExp).join('|');
-  const tagRe = new RegExp(`<\\s*(/?)\\s*(${names})\\b`, 'g');
   const usages: IconUsage[] = [];
 
-  for (const match of code.matchAll(tagRe)) {
-    const [, closing, local] = match;
+  for (let index = 0; index < code.length; index += 1) {
+    if (code.charCodeAt(index) !== 60) {
+      continue;
+    }
+
+    let cursor = index + 1;
+    while (isWhitespace(code[cursor])) {
+      cursor += 1;
+    }
+
+    const closing = code[cursor] === '/';
+    if (closing) {
+      cursor += 1;
+      while (isWhitespace(code[cursor])) {
+        cursor += 1;
+      }
+    }
+
+    if (!isIdentifierStart(code[cursor])) {
+      continue;
+    }
+
+    const localStart = cursor;
+    cursor += 1;
+    while (isIdentifierPart(code[cursor])) {
+      cursor += 1;
+    }
+
+    const local = code.slice(localStart, cursor);
     const symbol = symbols.get(local);
     if (!symbol) {
       continue;
     }
 
-    const localStart = match.index + match[0].lastIndexOf(local);
     const kind = closing ? 'closing' : 'opening';
     let hasIconId = false;
     if (!closing) {
-      const tagEnd = findJsxOpeningTagEnd(code, localStart + local.length);
-      hasIconId =
-        tagEnd !== -1 &&
-        /\biconId\s*=/.test(code.slice(localStart + local.length, tagEnd));
+      const tagEnd = findJsxOpeningTagEnd(code, cursor);
+      hasIconId = tagEnd !== -1 && hasIconIdAttribute(code, cursor, tagEnd);
     }
 
     usages.push({
       local,
-      range: [localStart, localStart + local.length],
+      range: [localStart, cursor],
       pack: symbol.pack,
       exportName: symbol.exportName,
       kind,
@@ -271,6 +320,41 @@ const scanJsxIconUsages = (
   }
 
   return usages;
+};
+
+const hasIconIdAttribute = (
+  code: string,
+  start: number,
+  end: number,
+): boolean => {
+  for (let index = start; index < end; index += 1) {
+    if (
+      code.charCodeAt(index) !== 105 ||
+      code.charCodeAt(index + 1) !== 99 ||
+      code.charCodeAt(index + 2) !== 111 ||
+      code.charCodeAt(index + 3) !== 110 ||
+      code.charCodeAt(index + 4) !== 73 ||
+      code.charCodeAt(index + 5) !== 100
+    ) {
+      continue;
+    }
+
+    if (
+      isIdentifierPart(code[index - 1]) ||
+      isIdentifierPart(code[index + 6])
+    ) {
+      continue;
+    }
+
+    let cursor = index + 6;
+    while (isWhitespace(code[cursor])) {
+      cursor += 1;
+    }
+    if (code[cursor] === '=') {
+      return true;
+    }
+  }
+  return false;
 };
 
 const findJsxOpeningTagEnd = (code: string, start: number): number => {
@@ -552,7 +636,9 @@ export const transformModule = (
     return { code, map: null, anyReplacements: false };
   }
 
-  const spriteIconImport = scanSpriteIconImport(code);
+  const spriteIconImport = code.includes(ICON_SOURCE)
+    ? scanSpriteIconImport(code)
+    : { hasImport: false, localName: ICON_COMPONENT_NAME };
   const usages = scanJsxIconUsages(code, table);
   const fontAwesomeUsages = hasPotentialFontAwesomeUsage
     ? scanFontAwesomeUsages(code, table, scanFontAwesomeComponents(code))
@@ -597,10 +683,9 @@ export const transformModule = (
   }
 
   const cleanupEdits = cleanupScannedImports(code, scannedImports, used);
-  const cleanupFontAwesomeEdits = cleanupScannedFontAwesomeComponentImports(
-    code,
-    usedFontAwesomeComponents,
-  );
+  const cleanupFontAwesomeEdits = usedFontAwesomeComponents.size
+    ? cleanupScannedFontAwesomeComponentImports(code, usedFontAwesomeComponents)
+    : [];
 
   const allEdits = [...edits, ...cleanupEdits, ...cleanupFontAwesomeEdits];
   const importPrefix = `import { ${ICON_COMPONENT_NAME} } from "${ICON_SOURCE}";\n`;
