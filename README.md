@@ -128,6 +128,9 @@ This is a big win when you’re rendering icons in lists, tables, or maps where 
 
 ### Performance comparison
 
+The build-time transform is also intentionally small. The current Vitest benchmark transforms a component with 240 icon
+usages at **12,146.66 ops/sec** (mean **0.0823 ms** per transform) on the machine listed below.
+
 | icon (pack)             | react-icons icon render mean time | react-icons-sprite icon render mean time | Relative difference |
 |-------------------------|----------------------------------:|-----------------------------------------:|--------------------:|
 | **FiCpu** (fi)          |                          0.188 ms |                                 0.048 ms |     74.6% reduction |

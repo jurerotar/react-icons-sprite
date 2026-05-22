@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.schemastore.org/package.json",
   "name": "react-icons-sprite",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0",
   "type": "module",
   "description": "A lightweight Vite, Rsbuild and Webpack plugin for react-icons that builds a single SVG sprite and rewrites icons to <use>, reducing bundle size and runtime overhead.",
   "author": "Jure Rotar <hello@jurerotar.com>",
@@ -71,7 +71,7 @@
     "@carbon/icons-react": "11.81.0",
     "@types/node": "25.9.1",
     "@types/react-dom": "19.2.3",
-    "@typescript/native-preview": "7.0.0-dev.20260521.1",
+    "@typescript/native-preview": "7.0.0-dev.20260522.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "tsdown": "0.22.0",
