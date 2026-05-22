@@ -1,11 +1,8 @@
-import { parseSync, Visitor } from 'oxc-parser';
 import type { SourceMap } from 'magic-string';
 import { DEFAULT_ICON_SOURCES } from '../packs/icon-resolvers';
 import { applyEdits } from './edit-applier';
 import { buildEdits, type EditOperation, type IconUsage } from './edit-builder';
 import { fastFilter } from './fast-filter';
-import { scanIconImports } from './import-scanner';
-import { detectUsage } from './usage-scanner';
 import { computeIconId } from '../utils/compute-icon-id';
 
 export const ICON_SOURCE = 'react-icons-sprite';
@@ -34,9 +31,17 @@ type TransformModuleOptions = {
   sourceMap?: boolean;
 };
 
-type ImportSpecifierMeta = {
+type ScannedImportSpecifier = {
   local: string;
-  specifier: Record<string, unknown>;
+  exportName: string;
+  range: NodeRange;
+};
+
+type ScannedImport = {
+  pack: string;
+  declarationRange: NodeRange;
+  specifiers: ScannedImportSpecifier[];
+  specifierCount: number;
 };
 
 type SpriteIconImport = {
@@ -49,249 +54,335 @@ const sourceMatches = (source: RegExp, pack: string): boolean => {
   return source.test(pack);
 };
 
-const isObject = (value: unknown): value is Record<string, unknown> => {
-  return Boolean(value) && typeof value === 'object';
+const IMPORT_RE = /import\s+([^;]+?)\s+from\s+(['"])([^'"]+)\2\s*;?/g;
+
+const trimRange = (value: string, offset: number): NodeRange | null => {
+  let start = 0;
+  let end = value.length;
+  while (start < end && /\s/.test(value[start])) {
+    start += 1;
+  }
+  while (end > start && /\s/.test(value[end - 1])) {
+    end -= 1;
+  }
+  return start === end ? null : [offset + start, offset + end];
 };
 
-const walkAst = (
-  node: unknown,
-  visit: (current: Record<string, unknown>) => void,
+const parseNamedSpecifiers = (
+  specifier: string,
+  specifierOffset: number,
+  imports: ScannedImportSpecifier[],
 ): void => {
-  if (!isObject(node)) {
+  const start = specifier.indexOf('{');
+  const end = specifier.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) {
     return;
   }
-  visit(node);
 
-  for (const value of Object.values(node)) {
-    if (Array.isArray(value)) {
-      for (const child of value) {
-        walkAst(child, visit);
-      }
+  let segmentStart = start + 1;
+  for (let index = start + 1; index <= end; index += 1) {
+    if (index !== end && specifier[index] !== ',') {
       continue;
     }
-    walkAst(value, visit);
+
+    const segment = specifier.slice(segmentStart, index);
+    const range = trimRange(segment, specifierOffset + segmentStart);
+    segmentStart = index + 1;
+    if (!range) {
+      continue;
+    }
+
+    const text = specifier.slice(
+      range[0] - specifierOffset,
+      range[1] - specifierOffset,
+    );
+    if (text.startsWith('type ')) {
+      continue;
+    }
+
+    const aliasMatch = /^(.*?)\s+as\s+([A-Za-z_$][\w$]*)$/.exec(text);
+    const exportName = aliasMatch ? aliasMatch[1].trim() : text.trim();
+    const local = aliasMatch ? aliasMatch[2] : exportName;
+    if (exportName && local) {
+      imports.push({ local, exportName, range });
+    }
   }
 };
 
-const buildSymbolTable = (
-  program: Record<string, unknown>,
-  sources: readonly RegExp[],
-): Map<string, IconSymbol> => {
-  const table = new Map<string, IconSymbol>();
-  const body = (program.body as unknown[]) ?? [];
+const countImportSpecifiers = (specifier: string): number => {
+  let count = 0;
+  const braceStart = specifier.indexOf('{');
+  const defaultPart =
+    braceStart === -1 ? specifier : specifier.slice(0, braceStart);
+  const defaultText = defaultPart.replace(/,$/, '').trim();
+  if (defaultText) {
+    count += 1;
+  }
 
-  for (const node of body) {
-    if (!isObject(node) || node.type !== 'ImportDeclaration') {
-      continue;
-    }
-    const source = isObject(node.source) ? node.source : undefined;
-    const pack = typeof source?.value === 'string' ? source.value : undefined;
-    if (
-      !pack ||
-      node.importKind === 'type' ||
-      !sources.some((sourceMatcher) => sourceMatches(sourceMatcher, pack))
-    ) {
-      continue;
-    }
-
-    const specifiers = (node.specifiers as unknown[]) ?? [];
-    for (const specifier of specifiers) {
-      if (!isObject(specifier) || !isObject(specifier.local)) {
-        continue;
-      }
-      if (specifier.importKind === 'type') {
-        continue;
-      }
-      const localName = specifier.local.name;
-      if (typeof localName !== 'string') {
-        continue;
-      }
-
-      if (specifier.type === 'ImportSpecifier') {
-        const imported = isObject(specifier.imported)
-          ? specifier.imported
-          : undefined;
-        const importedName =
-          typeof imported?.name === 'string'
-            ? imported.name
-            : typeof imported?.value === 'string'
-              ? imported.value
-              : undefined;
-        if (importedName) {
-          table.set(localName, { pack, exportName: importedName });
-        }
-        continue;
-      }
-
-      if (specifier.type === 'ImportDefaultSpecifier') {
-        table.set(localName, { pack, exportName: 'default' });
+  const braceEnd = specifier.lastIndexOf('}');
+  if (braceStart !== -1 && braceEnd > braceStart) {
+    const named = specifier.slice(braceStart + 1, braceEnd);
+    for (const segment of named.split(',')) {
+      if (segment.trim()) {
+        count += 1;
       }
     }
   }
 
+  return count;
+};
+
+const scanImportsDetailed = (
+  code: string,
+  sources: readonly RegExp[],
+): ScannedImport[] => {
+  const imports: ScannedImport[] = [];
+  IMPORT_RE.lastIndex = 0;
+
+  for (const match of code.matchAll(IMPORT_RE)) {
+    const [statement, specifier, , pack] = match;
+    if (!sources.some((source) => sourceMatches(source, pack))) {
+      continue;
+    }
+
+    const normalizedSpecifier = specifier.trim();
+    if (normalizedSpecifier.startsWith('type ')) {
+      continue;
+    }
+
+    const matchStart = match.index;
+    const specifierOffset = matchStart + statement.indexOf(specifier);
+    const specifiers: ScannedImportSpecifier[] = [];
+    const braceStart = specifier.indexOf('{');
+    const defaultPart =
+      braceStart === -1 ? specifier : specifier.slice(0, braceStart);
+    const defaultText = defaultPart.replace(/,$/, '');
+    const defaultRange = trimRange(defaultText, specifierOffset);
+    if (
+      defaultRange &&
+      !specifier
+        .slice(
+          defaultRange[0] - specifierOffset,
+          defaultRange[1] - specifierOffset,
+        )
+        .startsWith('type ')
+    ) {
+      const local = specifier.slice(
+        defaultRange[0] - specifierOffset,
+        defaultRange[1] - specifierOffset,
+      );
+      if (local && /^[A-Za-z_$][\w$]*$/.test(local)) {
+        specifiers.push({ local, exportName: 'default', range: defaultRange });
+      }
+    }
+
+    parseNamedSpecifiers(specifier, specifierOffset, specifiers);
+    if (specifiers.length) {
+      imports.push({
+        pack,
+        declarationRange: [matchStart, matchStart + statement.length],
+        specifiers,
+        specifierCount: countImportSpecifiers(specifier),
+      });
+    }
+  }
+
+  return imports;
+};
+
+const buildScannedSymbolTable = (
+  imports: ScannedImport[],
+): Map<string, IconSymbol> => {
+  const table = new Map<string, IconSymbol>();
+  for (const item of imports) {
+    for (const specifier of item.specifiers) {
+      table.set(specifier.local, {
+        pack: item.pack,
+        exportName: specifier.exportName,
+      });
+    }
+  }
   return table;
 };
 
-const findSpriteIconImport = (
-  program: Record<string, unknown>,
-): SpriteIconImport => {
-  const body = (program.body as unknown[]) ?? [];
-
-  for (const node of body) {
-    if (!isObject(node) || node.type !== 'ImportDeclaration') {
+const scanSpriteIconImport = (code: string): SpriteIconImport => {
+  IMPORT_RE.lastIndex = 0;
+  for (const match of code.matchAll(IMPORT_RE)) {
+    const [, specifier, , source] = match;
+    if (source !== ICON_SOURCE) {
       continue;
     }
-    const source = isObject(node.source) ? node.source : undefined;
-    if (source?.value !== ICON_SOURCE) {
-      continue;
-    }
-
-    const specifiers = (node.specifiers as unknown[]) ?? [];
-    for (const specifier of specifiers) {
-      if (
-        !isObject(specifier) ||
-        specifier.type !== 'ImportSpecifier' ||
-        !isObject(specifier.imported) ||
-        !isObject(specifier.local)
-      ) {
-        continue;
-      }
-
-      const importedName =
-        typeof specifier.imported.name === 'string'
-          ? specifier.imported.name
-          : typeof specifier.imported.value === 'string'
-            ? specifier.imported.value
-            : undefined;
-      const localName =
-        typeof specifier.local.name === 'string'
-          ? specifier.local.name
-          : undefined;
-
-      if (importedName === ICON_COMPONENT_NAME && localName) {
-        return { hasImport: true, localName };
+    const specifiers: ScannedImportSpecifier[] = [];
+    parseNamedSpecifiers(
+      specifier,
+      match.index + match[0].indexOf(specifier),
+      specifiers,
+    );
+    for (const item of specifiers) {
+      if (item.exportName === ICON_COMPONENT_NAME) {
+        return { hasImport: true, localName: item.local };
       }
     }
   }
-
   return { hasImport: false, localName: ICON_COMPONENT_NAME };
 };
 
-const detectIconUsage = (
-  program: Record<string, unknown>,
+const escapeRegExp = (value: string): string => {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+const scanJsxIconUsages = (
+  code: string,
   symbols: Map<string, IconSymbol>,
 ): IconUsage[] => {
+  if (!symbols.size) {
+    return [];
+  }
+
+  const names = [...symbols.keys()].map(escapeRegExp).join('|');
+  const tagRe = new RegExp(`<\\s*(/?)\\s*(${names})\\b`, 'g');
   const usages: IconUsage[] = [];
 
-  const visitElement = (
-    node: Record<string, unknown>,
-    kind: 'opening' | 'closing',
-  ): void => {
-    const name = isObject(node.name) ? node.name : undefined;
-    if (
-      !name ||
-      name.type !== 'JSXIdentifier' ||
-      typeof name.name !== 'string'
-    ) {
-      return;
-    }
-
-    const symbol = symbols.get(name.name);
+  for (const match of code.matchAll(tagRe)) {
+    const [, closing, local] = match;
+    const symbol = symbols.get(local);
     if (!symbol) {
-      return;
+      continue;
     }
 
-    const range = name.range as NodeRange | undefined;
-    if (!range || range.length !== 2) {
-      return;
-    }
-
+    const localStart = match.index + match[0].lastIndexOf(local);
+    const kind = closing ? 'closing' : 'opening';
     let hasIconId = false;
-    if (kind === 'opening') {
-      const attributes = (node.attributes as unknown[]) ?? [];
-      hasIconId = attributes.some((attribute) => {
-        if (!isObject(attribute) || attribute.type !== 'JSXAttribute') {
-          return false;
-        }
-        const attributeName = isObject(attribute.name)
-          ? attribute.name
-          : undefined;
-        return (
-          attributeName?.type === 'JSXIdentifier' &&
-          attributeName.name === 'iconId'
-        );
-      });
+    if (!closing) {
+      const tagEnd = findJsxOpeningTagEnd(code, localStart + local.length);
+      hasIconId =
+        tagEnd !== -1 &&
+        /\biconId\s*=/.test(code.slice(localStart + local.length, tagEnd));
     }
 
     usages.push({
-      local: name.name,
-      range,
+      local,
+      range: [localStart, localStart + local.length],
       pack: symbol.pack,
       exportName: symbol.exportName,
       kind,
       hasIconId,
     });
-  };
-
-  const visitor = new Visitor({
-    JSXOpeningElement(node: unknown) {
-      if (isObject(node)) {
-        visitElement(node, 'opening');
-      }
-    },
-    JSXClosingElement(node: unknown) {
-      if (isObject(node)) {
-        visitElement(node, 'closing');
-      }
-    },
-  });
-  visitor.visit(program as unknown as Parameters<Visitor['visit']>[0]);
+  }
 
   return usages;
 };
 
-const detectFontAwesomeComponents = (
-  program: Record<string, unknown>,
-): Set<string> => {
-  const componentLocals = new Set<string>();
-  const body = (program.body as unknown[]) ?? [];
-
-  for (const node of body) {
-    if (!isObject(node) || node.type !== 'ImportDeclaration') {
-      continue;
-    }
-    const source = isObject(node.source) ? node.source : undefined;
-    if (source?.value !== FONTAWESOME_REACT_PACK) {
-      continue;
-    }
-
-    const specifiers = (node.specifiers as unknown[]) ?? [];
-    for (const specifier of specifiers) {
-      if (
-        !isObject(specifier) ||
-        specifier.type !== 'ImportSpecifier' ||
-        !isObject(specifier.local) ||
-        !isObject(specifier.imported)
-      ) {
-        continue;
+const findJsxOpeningTagEnd = (code: string, start: number): number => {
+  let quote: string | null = null;
+  let braceDepth = 0;
+  for (let index = start; index < code.length; index += 1) {
+    const char = code[index];
+    if (quote) {
+      if (char === quote && code[index - 1] !== '\\') {
+        quote = null;
       }
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '{') {
+      braceDepth += 1;
+      continue;
+    }
+    if (char === '}') {
+      braceDepth -= 1;
+      continue;
+    }
+    if (char === '>' && braceDepth === 0) {
+      return index;
+    }
+  }
+  return -1;
+};
 
-      const importedName =
-        typeof specifier.imported.name === 'string'
-          ? specifier.imported.name
-          : undefined;
-      const localName =
-        typeof specifier.local.name === 'string'
-          ? specifier.local.name
-          : undefined;
-
-      if (importedName === 'FontAwesomeIcon' && localName) {
-        componentLocals.add(localName);
+const scanFontAwesomeComponents = (code: string): Set<string> => {
+  const locals = new Set<string>();
+  IMPORT_RE.lastIndex = 0;
+  for (const match of code.matchAll(IMPORT_RE)) {
+    const [, specifier, , source] = match;
+    if (source !== FONTAWESOME_REACT_PACK) {
+      continue;
+    }
+    const specifiers: ScannedImportSpecifier[] = [];
+    parseNamedSpecifiers(
+      specifier,
+      match.index + match[0].indexOf(specifier),
+      specifiers,
+    );
+    for (const item of specifiers) {
+      if (item.exportName === 'FontAwesomeIcon') {
+        locals.add(item.local);
       }
     }
   }
+  return locals;
+};
 
-  return componentLocals;
+const scanFontAwesomeUsages = (
+  code: string,
+  symbols: Map<string, IconSymbol>,
+  componentLocals: Set<string>,
+): FontAwesomeIconUsage[] => {
+  if (!componentLocals.size) {
+    return [];
+  }
+
+  const names = [...componentLocals].map(escapeRegExp).join('|');
+  const tagRe = new RegExp(`<\\s*(${names})\\b`, 'g');
+  const usages: FontAwesomeIconUsage[] = [];
+
+  for (const match of code.matchAll(tagRe)) {
+    const componentLocal = match[1];
+    const componentStart = match.index + match[0].lastIndexOf(componentLocal);
+    const tagEnd = findJsxOpeningTagEnd(
+      code,
+      componentStart + componentLocal.length,
+    );
+    if (tagEnd === -1) {
+      continue;
+    }
+
+    const attributes = code.slice(
+      componentStart + componentLocal.length,
+      tagEnd,
+    );
+    const iconMatch = /\sicon\s*=\s*\{\s*([A-Za-z_$][\w$]*)\s*\}/.exec(
+      attributes,
+    );
+    if (!iconMatch || iconMatch.index === undefined) {
+      continue;
+    }
+
+    const symbol = symbols.get(iconMatch[1]);
+    if (!symbol || !isFontAwesomeIconPack(symbol.pack)) {
+      continue;
+    }
+
+    const attributeStart =
+      componentStart + componentLocal.length + iconMatch.index;
+    usages.push({
+      componentLocal,
+      componentRange: [componentStart, componentStart + componentLocal.length],
+      iconAttributeRange: [
+        attributeStart,
+        attributeStart + iconMatch[0].length,
+      ],
+      hasIconId: /\biconId\s*=/.test(attributes),
+      iconLocal: iconMatch[1],
+      pack: symbol.pack,
+      exportName: symbol.exportName,
+    });
+  }
+
+  return usages;
 };
 
 type FontAwesomeIconUsage = {
@@ -304,154 +395,35 @@ type FontAwesomeIconUsage = {
   exportName: string;
 };
 
-const detectFontAwesomeIconUsages = (
-  program: Record<string, unknown>,
-  symbols: Map<string, IconSymbol>,
-  fontAwesomeComponentLocals: Set<string>,
-): FontAwesomeIconUsage[] => {
-  if (!fontAwesomeComponentLocals.size) {
-    return [];
-  }
-
-  const usages: FontAwesomeIconUsage[] = [];
-
-  walkAst(program, (node) => {
-    if (node.type !== 'JSXOpeningElement') {
-      return;
-    }
-
-    const name = isObject(node.name) ? node.name : undefined;
-    if (
-      !name ||
-      name.type !== 'JSXIdentifier' ||
-      typeof name.name !== 'string' ||
-      !fontAwesomeComponentLocals.has(name.name)
-    ) {
-      return;
-    }
-
-    const componentRange = name.range as NodeRange | undefined;
-    if (!componentRange || componentRange.length !== 2) {
-      return;
-    }
-
-    const attributes = (node.attributes as unknown[]) ?? [];
-    let hasIconId = false;
-    for (const attribute of attributes) {
-      if (!isObject(attribute) || attribute.type !== 'JSXAttribute') {
-        continue;
-      }
-
-      const attributeName = isObject(attribute.name)
-        ? attribute.name
-        : undefined;
-      if (!attributeName || attributeName.type !== 'JSXIdentifier') {
-        continue;
-      }
-      if (attributeName.name === 'iconId') {
-        hasIconId = true;
-        continue;
-      }
-      if (attributeName.name !== 'icon') {
-        continue;
-      }
-
-      const value = isObject(attribute.value) ? attribute.value : undefined;
-      if (!value || value.type !== 'JSXExpressionContainer') {
-        continue;
-      }
-
-      const expression = isObject(value.expression)
-        ? value.expression
-        : undefined;
-      if (
-        !expression ||
-        expression.type !== 'Identifier' ||
-        typeof expression.name !== 'string'
-      ) {
-        continue;
-      }
-
-      const symbol = symbols.get(expression.name);
-      if (!symbol || !isFontAwesomeIconPack(symbol.pack)) {
-        continue;
-      }
-
-      const iconAttributeRange = attribute.range as NodeRange | undefined;
-      if (!iconAttributeRange || iconAttributeRange.length !== 2) {
-        continue;
-      }
-
-      usages.push({
-        componentLocal: name.name,
-        componentRange,
-        iconAttributeRange,
-        hasIconId,
-        iconLocal: expression.name,
-        pack: symbol.pack,
-        exportName: symbol.exportName,
-      });
-      break;
-    }
-  });
-
-  return usages;
-};
-
-const cleanupImports = (
+const cleanupScannedImports = (
   code: string,
-  program: Record<string, unknown>,
-  symbols: Map<string, IconSymbol>,
+  imports: ScannedImport[],
   usedLocals: Set<string>,
 ): EditOperation[] => {
   const edits: EditOperation[] = [];
-  const body = (program.body as unknown[]) ?? [];
 
-  for (const node of body) {
-    if (!isObject(node) || node.type !== 'ImportDeclaration') {
-      continue;
-    }
-    const specifiers = (node.specifiers as unknown[]) ?? [];
-    const declarationRange = node.range as NodeRange | undefined;
-
-    const iconSpecifiers: ImportSpecifierMeta[] = [];
-    for (const specifier of specifiers) {
-      if (!isObject(specifier) || !isObject(specifier.local)) {
-        continue;
-      }
-      const localName = specifier.local.name;
-      if (typeof localName !== 'string' || !symbols.has(localName)) {
-        continue;
-      }
-      iconSpecifiers.push({ local: localName, specifier });
-    }
-
-    const usedSpecifiers = iconSpecifiers.filter(({ local }) =>
-      usedLocals.has(local),
+  for (const item of imports) {
+    const usedSpecifiers = item.specifiers.filter((specifier) =>
+      usedLocals.has(specifier.local),
     );
     if (!usedSpecifiers.length) {
       continue;
     }
 
     if (
-      usedSpecifiers.length === iconSpecifiers.length &&
-      specifiers.length === iconSpecifiers.length &&
-      declarationRange
+      usedSpecifiers.length === item.specifiers.length &&
+      item.specifierCount === item.specifiers.length
     ) {
       edits.push({
         type: 'remove',
-        from: declarationRange[0],
-        to: extendToLineEnd(code, declarationRange[1]),
+        from: item.declarationRange[0],
+        to: extendToLineEnd(code, item.declarationRange[1]),
       });
       continue;
     }
 
-    for (const { specifier } of usedSpecifiers) {
-      const range = specifier.range as NodeRange | undefined;
-      if (!range || range.length !== 2) {
-        continue;
-      }
-      const [from, to] = specifierRemovalRange(code, range);
+    for (const specifier of usedSpecifiers) {
+      const [from, to] = specifierRemovalRange(code, specifier.range);
       edits.push({ type: 'remove', from, to });
     }
   }
@@ -459,72 +431,44 @@ const cleanupImports = (
   return edits;
 };
 
-const cleanupFontAwesomeComponentImports = (
+const cleanupScannedFontAwesomeComponentImports = (
   code: string,
-  program: Record<string, unknown>,
   usedLocals: Set<string>,
 ): EditOperation[] => {
   const edits: EditOperation[] = [];
-  const body = (program.body as unknown[]) ?? [];
+  IMPORT_RE.lastIndex = 0;
 
-  for (const node of body) {
-    if (!isObject(node) || node.type !== 'ImportDeclaration') {
-      continue;
-    }
-    const source = isObject(node.source) ? node.source : undefined;
-    if (source?.value !== FONTAWESOME_REACT_PACK) {
+  for (const match of code.matchAll(IMPORT_RE)) {
+    const [statement, specifier, , source] = match;
+    if (source !== FONTAWESOME_REACT_PACK) {
       continue;
     }
 
-    const specifiers = (node.specifiers as unknown[]) ?? [];
-    const removableSpecifiers = specifiers.filter((specifier) => {
-      if (
-        !isObject(specifier) ||
-        specifier.type !== 'ImportSpecifier' ||
-        !isObject(specifier.local) ||
-        !isObject(specifier.imported)
-      ) {
-        return false;
-      }
-
-      const importedName =
-        typeof specifier.imported.name === 'string'
-          ? specifier.imported.name
-          : undefined;
-      const localName =
-        typeof specifier.local.name === 'string'
-          ? specifier.local.name
-          : undefined;
-
-      return (
-        importedName === 'FontAwesomeIcon' &&
-        Boolean(localName && usedLocals.has(localName))
-      );
-    });
-
+    const specifiers: ScannedImportSpecifier[] = [];
+    parseNamedSpecifiers(
+      specifier,
+      match.index + statement.indexOf(specifier),
+      specifiers,
+    );
+    const removableSpecifiers = specifiers.filter(
+      (item) =>
+        item.exportName === 'FontAwesomeIcon' && usedLocals.has(item.local),
+    );
     if (!removableSpecifiers.length) {
       continue;
     }
 
-    const declarationRange = node.range as NodeRange | undefined;
-    if (removableSpecifiers.length === specifiers.length && declarationRange) {
+    if (removableSpecifiers.length === specifiers.length) {
       edits.push({
         type: 'remove',
-        from: declarationRange[0],
-        to: extendToLineEnd(code, declarationRange[1]),
+        from: match.index,
+        to: extendToLineEnd(code, match.index + statement.length),
       });
       continue;
     }
 
     for (const specifier of removableSpecifiers) {
-      if (!isObject(specifier)) {
-        continue;
-      }
-      const range = specifier.range as NodeRange | undefined;
-      if (!range || range.length !== 2) {
-        continue;
-      }
-      const [from, to] = specifierRemovalRange(code, range);
+      const [from, to] = specifierRemovalRange(code, specifier.range);
       edits.push({ type: 'remove', from, to });
     }
   }
@@ -594,41 +538,24 @@ export const transformModule = (
     return { code, map: null, anyReplacements: false };
   }
 
-  const scanned = scanIconImports(code, sources);
-  if (!scanned.length) {
+  const scannedImports = scanImportsDetailed(code, sources);
+  if (!scannedImports.length) {
     return { code, map: null, anyReplacements: false };
   }
 
-  const names = scanned.flatMap((item) => item.names);
-  const hasJsxComponentUsage = detectUsage(code, names);
   const hasPotentialFontAwesomeUsage =
     code.includes(FONTAWESOME_REACT_PACK) &&
-    scanned.some((item) => isFontAwesomeIconPack(item.pack));
+    scannedImports.some((item) => isFontAwesomeIconPack(item.pack));
 
-  if (!hasJsxComponentUsage && !hasPotentialFontAwesomeUsage) {
-    return { code, map: null, anyReplacements: false };
-  }
-
-  const parsed = parseSync(id, code, {
-    lang: 'tsx',
-    sourceType: 'module',
-    range: true,
-  });
-
-  const program = parsed.program as unknown as Record<string, unknown>;
-  const table = buildSymbolTable(program, sources);
+  const table = buildScannedSymbolTable(scannedImports);
   if (!table.size) {
     return { code, map: null, anyReplacements: false };
   }
-  const spriteIconImport = findSpriteIconImport(program);
 
-  const usages = detectIconUsage(program, table);
+  const spriteIconImport = scanSpriteIconImport(code);
+  const usages = scanJsxIconUsages(code, table);
   const fontAwesomeUsages = hasPotentialFontAwesomeUsage
-    ? detectFontAwesomeIconUsages(
-        program,
-        table,
-        detectFontAwesomeComponents(program),
-      )
+    ? scanFontAwesomeUsages(code, table, scanFontAwesomeComponents(code))
     : [];
 
   if (!usages.length && !fontAwesomeUsages.length) {
@@ -669,10 +596,9 @@ export const transformModule = (
     }
   }
 
-  const cleanupEdits = cleanupImports(code, program, table, used);
-  const cleanupFontAwesomeEdits = cleanupFontAwesomeComponentImports(
+  const cleanupEdits = cleanupScannedImports(code, scannedImports, used);
+  const cleanupFontAwesomeEdits = cleanupScannedFontAwesomeComponentImports(
     code,
-    program,
     usedFontAwesomeComponents,
   );
 

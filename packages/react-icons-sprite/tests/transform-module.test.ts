@@ -222,6 +222,22 @@ describe('transformModule', () => {
     expect(used).toEqual([]);
   });
 
+  test('keeps type-only specifiers in mixed icon imports', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { type CircleProps, Circle } from "lucide-react";\nexport const A = () => <Circle />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain(
+      'import { type CircleProps } from "lucide-react";',
+    );
+    expect(result.code).not.toContain('Circle } from "lucide-react"');
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'Circle' }]);
+  });
+
   test('does not rewrite FontAwesome icon attribute when expression is not an identifier', () => {
     const used: Array<{ pack: string; exportName: string }> = [];
     const input = `import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";\nimport { faUser } from "@fortawesome/free-solid-svg-icons";\nexport const A = () => <FontAwesomeIcon icon={faUser.iconName} />;`;

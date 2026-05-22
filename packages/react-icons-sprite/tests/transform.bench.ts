@@ -31,7 +31,7 @@ const code = `
   );
 `;
 
-describe('transformModule benchmark (OXC parser)', () => {
+describe('transformModule benchmark', () => {
   bench('transforms a component with many icon usages', () => {
     transformModule(code, id, () => {});
   });

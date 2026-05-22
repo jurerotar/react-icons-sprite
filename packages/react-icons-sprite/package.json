@@ -65,8 +65,7 @@
     "react-dom": ">= 16"
   },
   "dependencies": {
-    "magic-string": "0.30.21",
-    "oxc-parser": "0.132.0"
+    "magic-string": "0.30.21"
   },
   "devDependencies": {
     "@carbon/icons-react": "11.81.0",
