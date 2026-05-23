@@ -1,6 +1,6 @@
 import type { SourceMap } from 'magic-string';
 import { DEFAULT_ICON_SOURCES } from '../packs/icon-resolvers';
-import { computeIconId } from '../utils/compute-icon-id';
+import { computeIconId, normalizePackAlias } from '../utils/compute-icon-id';
 import { applyEdits, applyEditsToString } from './edit-applier';
 import { buildEdits, type EditOperation, type IconUsage } from './edit-builder';
 import { fastFilter } from './fast-filter';
@@ -13,6 +13,7 @@ type NodeRange = [number, number];
 type IconSymbol = {
   pack: string;
   exportName: string;
+  iconId: string;
 };
 
 const FONTAWESOME_REACT_PACK = '@fortawesome/react-fontawesome';
@@ -195,10 +196,12 @@ const buildScannedSymbolTable = (
 ): Map<string, IconSymbol> => {
   const table = new Map<string, IconSymbol>();
   for (const item of imports) {
+    const iconIdPrefix = `ri-${normalizePackAlias(item.pack)}-`;
     for (const specifier of item.specifiers) {
       table.set(specifier.local, {
         pack: item.pack,
         exportName: specifier.exportName,
+        iconId: iconIdPrefix + specifier.exportName,
       });
     }
   }
@@ -258,9 +261,14 @@ const isWhitespace = (char: string | undefined): boolean => {
   );
 };
 
+const isWhitespaceCode = (code: number): boolean => {
+  return code === 32 || code === 9 || code === 10 || code === 13 || code === 12;
+};
+
 const scanJsxIconUsages = (
   code: string,
   symbols: Map<string, IconSymbol>,
+  hasAnyIconId: boolean,
 ): IconUsage[] => {
   if (!symbols.size) {
     return [];
@@ -304,7 +312,7 @@ const scanJsxIconUsages = (
 
     const kind = closing ? 'closing' : 'opening';
     let hasIconId = false;
-    if (!closing) {
+    if (hasAnyIconId && !closing) {
       const tagEnd = findJsxOpeningTagEnd(code, cursor);
       hasIconId = tagEnd !== -1 && hasIconIdAttribute(code, cursor, tagEnd);
     }
@@ -314,6 +322,7 @@ const scanJsxIconUsages = (
       range: [localStart, cursor],
       pack: symbol.pack,
       exportName: symbol.exportName,
+      iconId: symbol.iconId,
       kind,
       hasIconId,
     });
@@ -463,6 +472,7 @@ const scanFontAwesomeUsages = (
       iconLocal: iconMatch[1],
       pack: symbol.pack,
       exportName: symbol.exportName,
+      iconId: symbol.iconId,
     });
   }
 
@@ -477,6 +487,7 @@ type FontAwesomeIconUsage = {
   iconLocal: string;
   pack: string;
   exportName: string;
+  iconId: string;
 };
 
 const cleanupScannedImports = (
@@ -562,7 +573,11 @@ const cleanupScannedFontAwesomeComponentImports = (
 
 const extendToLineEnd = (code: string, end: number): number => {
   let to = end;
-  while (to < code.length && /[ \t]/.test(code[to])) {
+  while (to < code.length) {
+    const char = code.charCodeAt(to);
+    if (char !== 32 && char !== 9) {
+      break;
+    }
     to += 1;
   }
   if (code[to] === '\r' && code[to + 1] === '\n') {
@@ -582,7 +597,7 @@ const specifierRemovalRange = (
   let to = end;
 
   let before = start - 1;
-  while (before >= 0 && /\s/.test(code[before])) {
+  while (before >= 0 && isWhitespaceCode(code.charCodeAt(before))) {
     before -= 1;
   }
   if (before >= 0 && code[before] === ',') {
@@ -591,7 +606,7 @@ const specifierRemovalRange = (
   }
 
   let after = end;
-  while (after < code.length && /\s/.test(code[after])) {
+  while (after < code.length && isWhitespaceCode(code.charCodeAt(after))) {
     after += 1;
   }
   if (after < code.length && code[after] === ',') {
@@ -603,7 +618,7 @@ const specifierRemovalRange = (
 
 const consumeTrailingWhitespace = (code: string, start: number): number => {
   let to = start;
-  while (to < code.length && /\s/.test(code[to])) {
+  while (to < code.length && isWhitespaceCode(code.charCodeAt(to))) {
     to += 1;
   }
   return to;
@@ -639,7 +654,7 @@ export const transformModule = (
   const spriteIconImport = code.includes(ICON_SOURCE)
     ? scanSpriteIconImport(code)
     : { hasImport: false, localName: ICON_COMPONENT_NAME };
-  const usages = scanJsxIconUsages(code, table);
+  const usages = scanJsxIconUsages(code, table, code.includes('iconId'));
   const fontAwesomeUsages = hasPotentialFontAwesomeUsage
     ? scanFontAwesomeUsages(code, table, scanFontAwesomeComponents(code))
     : [];
@@ -664,7 +679,7 @@ export const transformModule = (
       edits.push({
         type: 'insert',
         pos: usage.componentRange[1],
-        value: ` iconId="${computeIconId(usage.pack, usage.exportName)}"`,
+        value: ` iconId="${usage.iconId}"`,
       });
     }
     edits.push({
