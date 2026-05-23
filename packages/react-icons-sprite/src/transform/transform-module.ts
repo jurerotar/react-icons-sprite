@@ -1,8 +1,8 @@
 import type { SourceMap } from 'magic-string';
 import { DEFAULT_ICON_SOURCES } from '../packs/icon-resolvers';
-import { computeIconId, normalizePackAlias } from '../utils/compute-icon-id';
+import { normalizePackAlias } from '../utils/compute-icon-id';
 import { applyEdits, applyEditsToString } from './edit-applier';
-import { buildEdits, type EditOperation, type IconUsage } from './edit-builder';
+import type { EditOperation } from './edit-builder';
 import { fastFilter } from './fast-filter';
 
 export const ICON_SOURCE = 'react-icons-sprite';
@@ -14,6 +14,11 @@ type IconSymbol = {
   pack: string;
   exportName: string;
   iconId: string;
+};
+
+type IconSymbolTable = {
+  items: Record<string, IconSymbol | undefined>;
+  size: number;
 };
 
 const FONTAWESOME_REACT_PACK = '@fortawesome/react-fontawesome';
@@ -191,21 +196,25 @@ const scanImportsDetailed = (
   return imports;
 };
 
-const buildScannedSymbolTable = (
-  imports: ScannedImport[],
-): Map<string, IconSymbol> => {
-  const table = new Map<string, IconSymbol>();
+const buildScannedSymbolTable = (imports: ScannedImport[]): IconSymbolTable => {
+  const items: Record<string, IconSymbol | undefined> = Object.create(null);
+  let size = 0;
+
   for (const item of imports) {
     const iconIdPrefix = `ri-${normalizePackAlias(item.pack)}-`;
     for (const specifier of item.specifiers) {
-      table.set(specifier.local, {
+      if (items[specifier.local] === undefined) {
+        size += 1;
+      }
+      items[specifier.local] = {
         pack: item.pack,
         exportName: specifier.exportName,
         iconId: iconIdPrefix + specifier.exportName,
-      });
+      };
     }
   }
-  return table;
+
+  return { items, size };
 };
 
 const scanSpriteIconImport = (code: string): SpriteIconImport => {
@@ -265,22 +274,31 @@ const isWhitespaceCode = (code: number): boolean => {
   return code === 32 || code === 9 || code === 10 || code === 13 || code === 12;
 };
 
-const scanJsxIconUsages = (
+type JsxIconEditScan = {
+  edits: EditOperation[];
+  count: number;
+};
+
+const scanJsxIconEdits = (
   code: string,
-  symbols: Map<string, IconSymbol>,
+  symbols: IconSymbolTable,
+  componentName: string,
+  usedSymbols: Set<string>,
+  register: (pack: string, exportName: string) => void,
   hasAnyIconId: boolean,
-): IconUsage[] => {
-  if (!symbols.size) {
-    return [];
+): JsxIconEditScan => {
+  if (symbols.size === 0) {
+    return { edits: [], count: 0 };
   }
 
-  const usages: IconUsage[] = [];
+  const edits: EditOperation[] = [];
+  let count = 0;
 
-  for (let index = 0; index < code.length; index += 1) {
-    if (code.charCodeAt(index) !== 60) {
-      continue;
-    }
-
+  for (
+    let index = code.indexOf('<');
+    index !== -1;
+    index = code.indexOf('<', index + 1)
+  ) {
     let cursor = index + 1;
     while (isWhitespace(code[cursor])) {
       cursor += 1;
@@ -305,30 +323,42 @@ const scanJsxIconUsages = (
     }
 
     const local = code.slice(localStart, cursor);
-    const symbol = symbols.get(local);
+    const symbol = symbols.items[local];
     if (!symbol) {
       continue;
     }
 
-    const kind = closing ? 'closing' : 'opening';
     let hasIconId = false;
     if (hasAnyIconId && !closing) {
       const tagEnd = findJsxOpeningTagEnd(code, cursor);
       hasIconId = tagEnd !== -1 && hasIconIdAttribute(code, cursor, tagEnd);
     }
 
-    usages.push({
-      local,
-      range: [localStart, cursor],
-      pack: symbol.pack,
-      exportName: symbol.exportName,
-      iconId: symbol.iconId,
-      kind,
-      hasIconId,
-    });
+    if (closing || hasIconId) {
+      edits.push({
+        type: 'replace',
+        from: localStart,
+        to: cursor,
+        value: componentName,
+      });
+    } else {
+      edits.push({
+        type: 'replace',
+        from: localStart,
+        to: cursor,
+        value: `${componentName} iconId="${symbol.iconId}"`,
+      });
+    }
+
+    count += 1;
+
+    if (!closing) {
+      usedSymbols.add(local);
+      register(symbol.pack, symbol.exportName);
+    }
   }
 
-  return usages;
+  return { edits, count };
 };
 
 const hasIconIdAttribute = (
@@ -421,7 +451,7 @@ const scanFontAwesomeComponents = (code: string): Set<string> => {
 
 const scanFontAwesomeUsages = (
   code: string,
-  symbols: Map<string, IconSymbol>,
+  symbols: IconSymbolTable,
   componentLocals: Set<string>,
 ): FontAwesomeIconUsage[] => {
   if (!componentLocals.size) {
@@ -454,7 +484,7 @@ const scanFontAwesomeUsages = (
       continue;
     }
 
-    const symbol = symbols.get(iconMatch[1]);
+    const symbol = symbols.items[iconMatch[1]];
     if (!symbol || !isFontAwesomeIconPack(symbol.pack)) {
       continue;
     }
@@ -654,18 +684,25 @@ export const transformModule = (
   const spriteIconImport = code.includes(ICON_SOURCE)
     ? scanSpriteIconImport(code)
     : { hasImport: false, localName: ICON_COMPONENT_NAME };
-  const usages = scanJsxIconUsages(code, table, code.includes('iconId'));
+  const used = new Set<string>();
+  const usedFontAwesomeComponents = new Set<string>();
+  const jsxScan = scanJsxIconEdits(
+    code,
+    table,
+    spriteIconImport.localName,
+    used,
+    register,
+    code.includes('iconId'),
+  );
   const fontAwesomeUsages = hasPotentialFontAwesomeUsage
     ? scanFontAwesomeUsages(code, table, scanFontAwesomeComponents(code))
     : [];
 
-  if (!usages.length && !fontAwesomeUsages.length) {
+  if (jsxScan.count === 0 && !fontAwesomeUsages.length) {
     return { code, map: null, anyReplacements: false };
   }
 
-  const used = new Set<string>();
-  const usedFontAwesomeComponents = new Set<string>();
-  const edits = buildEdits(usages, spriteIconImport.localName, used, register);
+  const edits = jsxScan.edits;
   const registeredFontAwesomeIcons = new Set<string>();
 
   for (const usage of fontAwesomeUsages) {
@@ -702,7 +739,10 @@ export const transformModule = (
     ? cleanupScannedFontAwesomeComponentImports(code, usedFontAwesomeComponents)
     : [];
 
-  const allEdits = [...edits, ...cleanupEdits, ...cleanupFontAwesomeEdits];
+  const canUsePresortedEdits = cleanupFontAwesomeEdits.length === 0;
+  const allEdits = canUsePresortedEdits
+    ? [...cleanupEdits, ...edits]
+    : [...edits, ...cleanupEdits, ...cleanupFontAwesomeEdits];
   const importPrefix = `import { ${ICON_COMPONENT_NAME} } from "${ICON_SOURCE}";\n`;
 
   if (!sourceMap) {
@@ -710,6 +750,7 @@ export const transformModule = (
       code: `${spriteIconImport.hasImport ? '' : importPrefix}${applyEditsToString(
         code,
         allEdits,
+        canUsePresortedEdits,
       )}`,
       map: null,
       anyReplacements: true,

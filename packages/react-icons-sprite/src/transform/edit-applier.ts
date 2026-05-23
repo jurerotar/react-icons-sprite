@@ -29,24 +29,27 @@ const editStart = (edit: EditOperation): number => {
 export const applyEditsToString = (
   code: string,
   edits: EditOperation[],
+  presorted = false,
 ): string => {
   if (!edits.length) {
     return code;
   }
 
-  const orderedEdits = [...edits].sort((left, right) => {
-    const startDelta = editStart(left) - editStart(right);
-    if (startDelta !== 0) {
-      return startDelta;
-    }
-    if (left.type === 'insert' && right.type !== 'insert') {
-      return 1;
-    }
-    if (left.type !== 'insert' && right.type === 'insert') {
-      return -1;
-    }
-    return 0;
-  });
+  const orderedEdits = presorted
+    ? edits
+    : [...edits].sort((left, right) => {
+        const startDelta = editStart(left) - editStart(right);
+        if (startDelta !== 0) {
+          return startDelta;
+        }
+        if (left.type === 'insert' && right.type !== 'insert') {
+          return 1;
+        }
+        if (left.type !== 'insert' && right.type === 'insert') {
+          return -1;
+        }
+        return 0;
+      });
 
   let result = '';
   let cursor = 0;
