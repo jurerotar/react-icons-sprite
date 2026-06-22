@@ -63,6 +63,27 @@ describe('transformModule', () => {
     ]);
   });
 
+  test('rewrites Hugeicons icon object usage to sprite component and registers icon', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { HugeiconsIcon } from "@hugeicons/react";\nimport { GlobalSearchIcon } from "@hugeicons/core-free-icons";\nexport const A = () => <HugeiconsIcon icon={GlobalSearchIcon} width={32} height={32} />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain('ReactIconsSpriteIcon');
+    expect(result.code).toContain(
+      'iconId="ri-hugeicons-core-free-icons-GlobalSearchIcon"',
+    );
+    expect(result.code).not.toContain('icon={GlobalSearchIcon}');
+    expect(result.code).not.toContain('@hugeicons/react');
+    expect(result.code).not.toContain('@hugeicons/core-free-icons');
+    expect(used).toEqual([
+      { pack: '@hugeicons/core-free-icons', exportName: 'GlobalSearchIcon' },
+    ]);
+  });
+
   test('ignores FontAwesome string icon usage', () => {
     const used: Array<{ pack: string; exportName: string }> = [];
     const input = `import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";\nexport const A = () => <FontAwesomeIcon icon="fa-user" />;`;

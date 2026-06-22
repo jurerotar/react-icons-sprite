@@ -56,6 +56,26 @@ describe('scanIconImports', () => {
     ]);
   });
 
+  test('extracts imports from newly supported standalone icon packages', () => {
+    const code = `
+      import { AlertOutlined } from "@ant-design/icons";
+      import AntAlert from "@ant-design/icons/AlertOutlined";
+      import { Add24Regular } from "@fluentui/react-icons";
+      import { Add24Filled } from "@fluentui/react-icons/svg/add";
+      import { AlertIcon } from "@primer/octicons-react";
+      import { GlobalSearchIcon } from "@hugeicons/core-free-icons";
+    `;
+
+    expect(scanIconImports(code, DEFAULT_ICON_SOURCES)).toEqual([
+      { pack: '@ant-design/icons', names: ['AlertOutlined'] },
+      { pack: '@ant-design/icons/AlertOutlined', names: ['AntAlert'] },
+      { pack: '@fluentui/react-icons', names: ['Add24Regular'] },
+      { pack: '@fluentui/react-icons/svg/add', names: ['Add24Filled'] },
+      { pack: '@primer/octicons-react', names: ['AlertIcon'] },
+      { pack: '@hugeicons/core-free-icons', names: ['GlobalSearchIcon'] },
+    ]);
+  });
+
   test('ignores imports from unsupported packs', () => {
     const code = `
       import { Circle } from "./icons";

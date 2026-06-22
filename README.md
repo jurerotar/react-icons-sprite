@@ -30,6 +30,10 @@ used by the demo apps and validation suite:
 | `@fortawesome/react-fontawesome` | `3.3.1` |
 | `@mui/icons-material` | `9.0.1` |
 | `@carbon/icons-react` | `11.81.0` |
+| `@ant-design/icons` | `6.2.5` |
+| `@fluentui/react-icons` | `2.0.330` |
+| `@primer/octicons-react` | `19.28.1` |
+| `@hugeicons/react` with `@hugeicons/core-free-icons` | `1.1.6` / `4.2.0` |
 
 > [!NOTE]
 > `react-icons-sprite` does not bundle these libraries. You must install whichever icon packages you intend to use in

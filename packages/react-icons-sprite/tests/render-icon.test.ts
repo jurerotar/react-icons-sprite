@@ -3,7 +3,9 @@ import { forwardRef } from 'react';
 import {
   extractSymbolAttributes,
   isFontAwesomeIconDefinition,
+  isHugeiconsIconDefinition,
   isRenderableComponent,
+  renderIcon,
 } from '../src/sprite/render-icon';
 
 describe('isRenderableComponent', () => {
@@ -52,5 +54,46 @@ describe('isFontAwesomeIconDefinition', () => {
         icon: ['512', 512, [], 'f0f4', 'M0 0h24v24H0z'],
       }),
     ).toBe(false);
+  });
+});
+
+describe('isHugeiconsIconDefinition', () => {
+  test('accepts valid Hugeicons icon definition arrays', () => {
+    expect(
+      isHugeiconsIconDefinition([
+        ['path', { d: 'M0 0h24v24H0z', stroke: 'currentColor' }],
+      ]),
+    ).toBe(true);
+  });
+
+  test('rejects invalid Hugeicons icon definition shapes', () => {
+    expect(isHugeiconsIconDefinition(null)).toBe(false);
+    expect(isHugeiconsIconDefinition({})).toBe(false);
+    expect(isHugeiconsIconDefinition([['path']])).toBe(false);
+  });
+});
+
+describe('renderIcon', () => {
+  test('unwraps nested CommonJS default icon exports', async () => {
+    const rendered = await renderIcon('@ant-design/icons', 'AlertOutlined', {
+      baseDir: process.cwd(),
+    });
+
+    expect(rendered.viewBox).toBe('64 64 896 896');
+    expect(rendered.symbolBody).toContain('<path');
+  });
+
+  test('renders Hugeicons icon definition exports', async () => {
+    const rendered = await renderIcon(
+      '@hugeicons/core-free-icons',
+      'GlobalSearchIcon',
+      {
+        baseDir: process.cwd(),
+      },
+    );
+
+    expect(rendered.viewBox).toBe('0 0 24 24');
+    expect(rendered.symbolAttributes).toContain('fill="none"');
+    expect(rendered.symbolBody).toContain('<path');
   });
 });
