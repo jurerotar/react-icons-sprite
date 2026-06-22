@@ -10,10 +10,10 @@
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.15",
-    "lefthook": "2.1.8",
-    "turbo": "2.9.14",
+    "@biomejs/biome": "2.5.0",
+    "lefthook": "2.1.9",
+    "turbo": "2.9.18",
     "typescript": "6.0.3"
   },
-  "packageManager": "npm@11.12.1"
+  "packageManager": "npm@11.16.0"
 }
