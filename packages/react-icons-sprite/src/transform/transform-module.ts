@@ -22,9 +22,14 @@ type IconSymbolTable = {
 };
 
 const FONTAWESOME_REACT_PACK = '@fortawesome/react-fontawesome';
+const HUGEICONS_REACT_PACK = '@hugeicons/react';
 
 const isFontAwesomeIconPack = (pack: string): boolean => {
   return /^@fortawesome\/[\w-]+-svg-icons$/.test(pack);
+};
+
+const isHugeiconsIconPack = (pack: string): boolean => {
+  return /^@hugeicons\/core-free-icons(?:\/.*)?$/.test(pack);
 };
 
 type TransformResult = {
@@ -520,6 +525,100 @@ type FontAwesomeIconUsage = {
   iconId: string;
 };
 
+type HugeiconsIconUsage = {
+  componentLocal: string;
+  componentRange: NodeRange;
+  iconAttributeRange: NodeRange;
+  iconLocal: string;
+  pack: string;
+  exportName: string;
+  iconId: string;
+  hasIconId: boolean;
+};
+
+const scanHugeiconsComponents = (code: string): Set<string> => {
+  const locals = new Set<string>();
+  IMPORT_RE.lastIndex = 0;
+  for (const match of code.matchAll(IMPORT_RE)) {
+    const [, specifier, , source] = match;
+    if (source !== HUGEICONS_REACT_PACK) {
+      continue;
+    }
+    const specifiers: ScannedImportSpecifier[] = [];
+    parseNamedSpecifiers(
+      specifier,
+      match.index + match[0].indexOf(specifier),
+      specifiers,
+    );
+    for (const item of specifiers) {
+      if (item.exportName === 'HugeiconsIcon') {
+        locals.add(item.local);
+      }
+    }
+  }
+  return locals;
+};
+
+const scanHugeiconsUsages = (
+  code: string,
+  symbols: IconSymbolTable,
+  componentLocals: Set<string>,
+): HugeiconsIconUsage[] => {
+  if (!componentLocals.size) {
+    return [];
+  }
+
+  const names = [...componentLocals].map(escapeRegExp).join('|');
+  const tagRe = new RegExp(`<\\s*(${names})\\b`, 'g');
+  const usages: HugeiconsIconUsage[] = [];
+
+  for (const match of code.matchAll(tagRe)) {
+    const componentLocal = match[1];
+    const componentStart = match.index + match[0].lastIndexOf(componentLocal);
+    const tagEnd = findJsxOpeningTagEnd(
+      code,
+      componentStart + componentLocal.length,
+    );
+    if (tagEnd === -1) {
+      continue;
+    }
+
+    const attributes = code.slice(
+      componentStart + componentLocal.length,
+      tagEnd,
+    );
+    const iconMatch = /\sicon\s*=\s*\{\s*([A-Za-z_$][\w$]*)\s*\}/.exec(
+      attributes,
+    );
+    if (!iconMatch || iconMatch.index === undefined) {
+      continue;
+    }
+
+    const symbol = symbols.items[iconMatch[1]];
+    if (!symbol || !isHugeiconsIconPack(symbol.pack)) {
+      continue;
+    }
+
+    const attributeStart =
+      componentStart + componentLocal.length + iconMatch.index;
+    usages.push({
+      componentLocal,
+      componentRange: [componentStart, componentStart + componentLocal.length],
+      iconAttributeRange: [
+        attributeStart,
+        attributeStart + iconMatch[0].length,
+      ],
+      iconLocal: iconMatch[1],
+      pack: symbol.pack,
+      exportName: symbol.exportName,
+      iconId: symbol.iconId,
+      hasIconId: /\biconId\s*=/.test(attributes),
+    });
+  }
+
+  return usages;
+};
+
 const cleanupScannedImports = (
   code: string,
   imports: ScannedImport[],
@@ -578,6 +677,51 @@ const cleanupScannedFontAwesomeComponentImports = (
     const removableSpecifiers = specifiers.filter(
       (item) =>
         item.exportName === 'FontAwesomeIcon' && usedLocals.has(item.local),
+    );
+    if (!removableSpecifiers.length) {
+      continue;
+    }
+
+    if (removableSpecifiers.length === specifiers.length) {
+      edits.push({
+        type: 'remove',
+        from: match.index,
+        to: extendToLineEnd(code, match.index + statement.length),
+      });
+      continue;
+    }
+
+    for (const specifier of removableSpecifiers) {
+      const [from, to] = specifierRemovalRange(code, specifier.range);
+      edits.push({ type: 'remove', from, to });
+    }
+  }
+
+  return edits;
+};
+
+const cleanupScannedHugeiconsComponentImports = (
+  code: string,
+  usedLocals: Set<string>,
+): EditOperation[] => {
+  const edits: EditOperation[] = [];
+  IMPORT_RE.lastIndex = 0;
+
+  for (const match of code.matchAll(IMPORT_RE)) {
+    const [statement, specifier, , source] = match;
+    if (source !== HUGEICONS_REACT_PACK) {
+      continue;
+    }
+
+    const specifiers: ScannedImportSpecifier[] = [];
+    parseNamedSpecifiers(
+      specifier,
+      match.index + statement.indexOf(specifier),
+      specifiers,
+    );
+    const removableSpecifiers = specifiers.filter(
+      (item) =>
+        item.exportName === 'HugeiconsIcon' && usedLocals.has(item.local),
     );
     if (!removableSpecifiers.length) {
       continue;
@@ -675,6 +819,9 @@ export const transformModule = (
   const hasPotentialFontAwesomeUsage =
     code.includes(FONTAWESOME_REACT_PACK) &&
     scannedImports.some((item) => isFontAwesomeIconPack(item.pack));
+  const hasPotentialHugeiconsUsage =
+    code.includes(HUGEICONS_REACT_PACK) &&
+    scannedImports.some((item) => isHugeiconsIconPack(item.pack));
 
   const table = buildScannedSymbolTable(scannedImports);
   if (!table.size) {
@@ -686,6 +833,7 @@ export const transformModule = (
     : { hasImport: false, localName: ICON_COMPONENT_NAME };
   const used = new Set<string>();
   const usedFontAwesomeComponents = new Set<string>();
+  const usedHugeiconsComponents = new Set<string>();
   const jsxScan = scanJsxIconEdits(
     code,
     table,
@@ -697,8 +845,15 @@ export const transformModule = (
   const fontAwesomeUsages = hasPotentialFontAwesomeUsage
     ? scanFontAwesomeUsages(code, table, scanFontAwesomeComponents(code))
     : [];
+  const hugeiconsUsages = hasPotentialHugeiconsUsage
+    ? scanHugeiconsUsages(code, table, scanHugeiconsComponents(code))
+    : [];
 
-  if (jsxScan.count === 0 && !fontAwesomeUsages.length) {
+  if (
+    jsxScan.count === 0 &&
+    !fontAwesomeUsages.length &&
+    !hugeiconsUsages.length
+  ) {
     return { code, map: null, anyReplacements: false };
   }
 
@@ -734,15 +889,55 @@ export const transformModule = (
     }
   }
 
+  const registeredHugeiconsIcons = new Set<string>();
+
+  for (const usage of hugeiconsUsages) {
+    edits.push({
+      type: 'replace',
+      from: usage.componentRange[0],
+      to: usage.componentRange[1],
+      value: spriteIconImport.localName,
+    });
+    if (!usage.hasIconId) {
+      edits.push({
+        type: 'insert',
+        pos: usage.componentRange[1],
+        value: ` iconId="${usage.iconId}"`,
+      });
+    }
+    edits.push({
+      type: 'remove',
+      from: usage.iconAttributeRange[0],
+      to: consumeTrailingWhitespace(code, usage.iconAttributeRange[1]),
+    });
+
+    used.add(usage.iconLocal);
+    usedHugeiconsComponents.add(usage.componentLocal);
+    const key = `${usage.pack}:${usage.exportName}`;
+    if (!registeredHugeiconsIcons.has(key)) {
+      registeredHugeiconsIcons.add(key);
+      register(usage.pack, usage.exportName);
+    }
+  }
+
   const cleanupEdits = cleanupScannedImports(code, scannedImports, used);
   const cleanupFontAwesomeEdits = usedFontAwesomeComponents.size
     ? cleanupScannedFontAwesomeComponentImports(code, usedFontAwesomeComponents)
     : [];
+  const cleanupHugeiconsEdits = usedHugeiconsComponents.size
+    ? cleanupScannedHugeiconsComponentImports(code, usedHugeiconsComponents)
+    : [];
 
-  const canUsePresortedEdits = cleanupFontAwesomeEdits.length === 0;
+  const canUsePresortedEdits =
+    cleanupFontAwesomeEdits.length === 0 && cleanupHugeiconsEdits.length === 0;
   const allEdits = canUsePresortedEdits
     ? [...cleanupEdits, ...edits]
-    : [...edits, ...cleanupEdits, ...cleanupFontAwesomeEdits];
+    : [
+        ...edits,
+        ...cleanupEdits,
+        ...cleanupFontAwesomeEdits,
+        ...cleanupHugeiconsEdits,
+      ];
   const importPrefix = `import { ${ICON_COMPONENT_NAME} } from "${ICON_SOURCE}";\n`;
 
   if (!sourceMap) {

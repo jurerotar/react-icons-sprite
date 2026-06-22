@@ -16,6 +16,11 @@ import { faCoffee } from '@fortawesome/free-solid-svg-icons';
 import AlarmMui from '@mui/icons-material/Alarm';
 import { Alarm as AlarmMuiNamed } from '@mui/icons-material';
 import { Add as CarbonAdd } from '@carbon/icons-react';
+import { AlertOutlined as AntAlertOutlined } from '@ant-design/icons';
+import { Add24Regular as FluentAdd24Regular } from '@fluentui/react-icons';
+import { AlertIcon as OcticonAlert } from '@primer/octicons-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { GlobalSearchIcon } from '@hugeicons/core-free-icons';
 
 const App = () => {
   return (
@@ -127,6 +132,33 @@ const App = () => {
         <section className="icon-card">
           <h2 className="icon-title">@carbon/icons-react</h2>
           <CarbonAdd size={32} />
+        </section>
+
+        <section className="icon-card">
+          <h2 className="icon-title">@ant-design/icons</h2>
+          <AntAlertOutlined style={{ fontSize: 32 }} />
+        </section>
+
+        <section className="icon-card">
+          <h2 className="icon-title">@fluentui/react-icons</h2>
+          <FluentAdd24Regular
+            width={32}
+            height={32}
+          />
+        </section>
+
+        <section className="icon-card">
+          <h2 className="icon-title">@primer/octicons-react</h2>
+          <OcticonAlert size={32} />
+        </section>
+
+        <section className="icon-card">
+          <h2 className="icon-title">@hugeicons/react</h2>
+          <HugeiconsIcon
+            icon={GlobalSearchIcon}
+            width={32}
+            height={32}
+          />
         </section>
       </div>
 

@@ -160,7 +160,10 @@ const resolveFromBaseDir = (
   const exportTarget = resolveExportTarget(packageJson.exports, parsed.subpath);
 
   if (exportTarget) {
-    return resolveFileCandidate(path.join(packageRoot, exportTarget)) ?? null;
+    const resolved = resolveFileCandidate(path.join(packageRoot, exportTarget));
+    if (resolved) {
+      return resolved;
+    }
   }
 
   if (parsed.subpath === '.') {
@@ -213,6 +216,18 @@ const pickExport = (
   return moduleExports[exportName] ?? moduleExports.default;
 };
 
+const unwrapNestedDefaultExport = (value: unknown): unknown => {
+  if (!value || typeof value !== 'object' || !('default' in value)) {
+    return value;
+  }
+
+  if ('$$typeof' in value) {
+    return value;
+  }
+
+  return (value as { default: unknown }).default;
+};
+
 export const isRenderableComponent = (
   value: unknown,
 ): value is ComponentType<Record<string, unknown>> => {
@@ -240,6 +255,13 @@ type FontAwesomeIconDefinition = {
   icon: FontAwesomeIconTuple;
 };
 
+type HugeiconsIconElement = readonly [
+  tag: string,
+  attributes: Readonly<Record<string, string | number>>,
+];
+
+type HugeiconsIconDefinition = readonly HugeiconsIconElement[];
+
 export const isFontAwesomeIconDefinition = (
   value: unknown,
 ): value is FontAwesomeIconDefinition => {
@@ -253,6 +275,22 @@ export const isFontAwesomeIconDefinition = (
   }
 
   return typeof icon[0] === 'number' && typeof icon[1] === 'number';
+};
+
+export const isHugeiconsIconDefinition = (
+  value: unknown,
+): value is HugeiconsIconDefinition => {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  return value.every((item) => {
+    if (!Array.isArray(item) || item.length < 2) {
+      return false;
+    }
+
+    return typeof item[0] === 'string' && typeof item[1] === 'object';
+  });
 };
 
 const renderFontAwesomeIconDefinition = (
@@ -269,6 +307,47 @@ const renderFontAwesomeIconDefinition = (
   };
 };
 
+const renderHugeiconsIconDefinition = (
+  iconDefinition: HugeiconsIconDefinition,
+): RenderedIcon => {
+  const children = [...iconDefinition]
+    .sort(([, a], [, b]) => {
+      const hasOpacityA = a.opacity !== undefined;
+      const hasOpacityB = b.opacity !== undefined;
+      return hasOpacityB ? 1 : hasOpacityA ? -1 : 0;
+    })
+    .map(([tag, attributes]) => {
+      const { key, ...rest } = attributes;
+      return createElement(tag, { ...rest, key });
+    });
+
+  const svgMarkup = renderToStaticMarkup(
+    createElement(
+      'svg',
+      {
+        xmlns: 'http://www.w3.org/2000/svg',
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        color: 'currentColor',
+      },
+      children,
+    ),
+  );
+  const svgInner = SVG_INNER_RE.exec(svgMarkup)?.[1];
+
+  if (!svgInner) {
+    throw new Error(
+      '[react-icons-sprite] Unable to extract SVG content for Hugeicons icon.',
+    );
+  }
+
+  return {
+    symbolBody: svgInner,
+    viewBox: '0 0 24 24',
+    symbolAttributes: extractSymbolAttributes(svgMarkup),
+  };
+};
+
 export const renderIcon = async (
   pack: string,
   exportName: string,
@@ -278,10 +357,16 @@ export const renderIcon = async (
   const imported = (await import(
     resolveImportSpecifier(importPath, options)
   )) as Record<string, unknown>;
-  const iconComponent = pickExport(imported, exportName);
+  const iconComponent = unwrapNestedDefaultExport(
+    pickExport(imported, exportName),
+  );
 
   if (isFontAwesomeIconDefinition(iconComponent)) {
     return renderFontAwesomeIconDefinition(iconComponent);
+  }
+
+  if (isHugeiconsIconDefinition(iconComponent)) {
+    return renderHugeiconsIconDefinition(iconComponent);
   }
 
   if (!isRenderableComponent(iconComponent)) {

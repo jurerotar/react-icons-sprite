@@ -60,6 +60,33 @@ describe('resolveIconImport', () => {
     expect(resolveIconImport('@carbon/icons-react', 'Add')).toBe(
       '@carbon/icons-react/es/Add.js',
     );
+    expect(resolveIconImport('@ant-design/icons', 'AlertOutlined')).toBe(
+      '@ant-design/icons/lib/icons/AlertOutlined.js',
+    );
+    expect(
+      resolveIconImport('@fluentui/react-icons', 'CalendarAdd24Regular'),
+    ).toBe('@fluentui/react-icons/lib-cjs/atoms/svg/calendar-add.js');
+    expect(resolveIconImport('@primer/octicons-react', 'AlertIcon')).toBe(
+      '@primer/octicons-react',
+    );
+    expect(
+      resolveIconImport('@hugeicons/core-free-icons', 'GlobalSearchIcon'),
+    ).toBe('@hugeicons/core-free-icons/GlobalSearchIcon');
+  });
+
+  test('resolves supported icon package subpath imports', () => {
+    expect(
+      resolveIconImport('@ant-design/icons/AlertOutlined', 'default'),
+    ).toBe('@ant-design/icons/lib/icons/AlertOutlined.js');
+    expect(
+      resolveIconImport('@fluentui/react-icons/svg/add', 'Add24Regular'),
+    ).toBe('@fluentui/react-icons/lib-cjs/atoms/svg/add.js');
+    expect(
+      resolveIconImport(
+        '@hugeicons/core-free-icons/GlobalSearchIcon',
+        'default',
+      ),
+    ).toBe('@hugeicons/core-free-icons/GlobalSearchIcon');
   });
 
   test('supports kebab-case conversion for acronym and numeric lucide names', () => {
