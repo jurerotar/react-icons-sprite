@@ -10,10 +10,22 @@
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.15",
-    "lefthook": "2.1.8",
-    "turbo": "2.9.14",
+    "@ant-design/icons": "6.3.2",
+    "@biomejs/biome": "2.5.1",
+    "@carbon/icons-react": "11.82.0",
+    "@fluentui/react-icons": "2.0.331",
+    "@hugeicons/core-free-icons": "4.2.2",
+    "@hugeicons/react": "1.1.9",
+    "@primer/octicons-react": "19.28.1",
+    "lefthook": "2.1.9",
+    "turbo": "2.10.0",
     "typescript": "6.0.3"
   },
-  "packageManager": "npm@11.12.1"
+  "packageManager": "npm@11.16.0",
+  "allowScripts": {
+    "@carbon/icon-helpers": false,
+    "@carbon/icons-react": false,
+    "@swc/core": true,
+    "lefthook": false
+  }
 }
