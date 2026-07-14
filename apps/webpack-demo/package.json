@@ -17,7 +17,7 @@
     "lint:check": "biome lint --no-errors-on-unmatched",
     "format": "biome format --write --no-errors-on-unmatched",
     "format:check": "biome format --no-errors-on-unmatched",
-    "type-check": "tsgo"
+    "type-check": "tsc"
   },
   "dependencies": {
     "@ant-design/icons": "6.3.2",
