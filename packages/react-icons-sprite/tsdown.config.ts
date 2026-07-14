@@ -36,6 +36,10 @@ const tsdownConfig: UserConfig = defineConfig({
   format: ['esm'],
   dts: true,
   clean: true,
+  copy: [
+    { from: '../../README.md', to: '.' },
+    { from: '../../LICENSE.md', to: '.' },
+  ],
   deps: {
     neverBundle: [
       ...iconPeerDependencies,
