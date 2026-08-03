@@ -31,5 +31,20 @@ jobs:
       - name: Build package
         run: npm run build --workspace react-icons-sprite
 
+      - name: Resolve npm dist tag
+        id: npm-tag
+        run: |
+          version="$(node -p "require('./packages/react-icons-sprite/package.json').version")"
+          prerelease="${version#*-}"
+          if [ "$prerelease" = "$version" ]; then
+            tag="latest"
+          elif [[ "$prerelease" =~ ^rc[0-9]*([.-].*)?$ ]]; then
+            tag="rc"
+          else
+            tag="${prerelease%%[.-]*}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Publishing react-icons-sprite@$version with npm dist-tag '$tag'"
+
       - name: Publish package with provenance
-        run: npm publish --workspace react-icons-sprite --access public
+        run: npm publish --workspace react-icons-sprite --access public --tag "${{ steps.npm-tag.outputs.tag }}"
