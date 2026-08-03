@@ -171,6 +171,27 @@ describe('transformModule', () => {
     expect(used).toEqual([{ pack: 'lucide-react', exportName: 'X' }]);
   });
 
+  test('does not duplicate reference prop rewrites from nested JSX inside attributes', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { ChevronDown } from "lucide-react";\nexport const A = () => <Menu trigger={<IconButton icon={ChevronDown} />} />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain(
+      'icon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-ChevronDown" />}',
+    );
+    expect(result.code.match(/ri-lucide-react-ChevronDown/g)).toHaveLength(1);
+    expect(result.code).not.toContain('icon={ChevronDown}');
+    expect(result.code).not.toContain(
+      '(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-ChevronDown" />\n  (props)',
+    );
+    expect(result.code).not.toContain('from "lucide-react"');
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'ChevronDown' }]);
+  });
+
   test('rewrites Hugeicons icon object usage to sprite component and registers icon', () => {
     const used: Array<{ pack: string; exportName: string }> = [];
     const input = `import { HugeiconsIcon } from "@hugeicons/react";\nimport { GlobalSearchIcon } from "@hugeicons/core-free-icons";\nexport const A = () => <HugeiconsIcon icon={GlobalSearchIcon} width={32} height={32} />;`;

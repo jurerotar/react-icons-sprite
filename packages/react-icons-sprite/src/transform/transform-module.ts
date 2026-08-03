@@ -423,12 +423,69 @@ const scanJsxReferencePropEdits = (
       continue;
     }
 
-    const attributes = code.slice(cursor, tagEnd);
-    const referenceAttributeRe =
-      /(\s[A-Za-z_$][\w$.-]*(?::[A-Za-z_$][\w$.-]*)?\s*=\s*\{\s*)([A-Za-z_$][\w$]*)(\s*\})/g;
+    let attributeCursor = cursor;
+    while (attributeCursor < tagEnd) {
+      while (isWhitespace(code[attributeCursor])) {
+        attributeCursor += 1;
+      }
 
-    for (const match of attributes.matchAll(referenceAttributeRe)) {
-      const iconLocal = match[2];
+      if (attributeCursor >= tagEnd || code[attributeCursor] === '/') {
+        break;
+      }
+
+      if (code[attributeCursor] === '{') {
+        const expressionEnd = findJsxExpressionEnd(code, attributeCursor);
+        attributeCursor = expressionEnd === -1 ? tagEnd : expressionEnd + 1;
+        continue;
+      }
+
+      if (!isIdentifierStart(code[attributeCursor])) {
+        attributeCursor += 1;
+        continue;
+      }
+
+      attributeCursor += 1;
+      while (isJsxAttributeNamePart(code[attributeCursor])) {
+        attributeCursor += 1;
+      }
+
+      while (isWhitespace(code[attributeCursor])) {
+        attributeCursor += 1;
+      }
+
+      if (code[attributeCursor] !== '=') {
+        continue;
+      }
+
+      attributeCursor += 1;
+      while (isWhitespace(code[attributeCursor])) {
+        attributeCursor += 1;
+      }
+
+      const valueStart = attributeCursor;
+      if (code[valueStart] === '"' || code[valueStart] === "'") {
+        attributeCursor = skipQuotedString(code, valueStart);
+        continue;
+      }
+
+      if (code[valueStart] !== '{') {
+        continue;
+      }
+
+      const expressionEnd = findJsxExpressionEnd(code, valueStart);
+      if (expressionEnd === -1 || expressionEnd > tagEnd) {
+        attributeCursor = tagEnd;
+        continue;
+      }
+
+      attributeCursor = expressionEnd + 1;
+      const expression = code.slice(valueStart + 1, expressionEnd);
+      const iconMatch = /^(\s*)([A-Za-z_$][\w$]*)(\s*)$/.exec(expression);
+      if (!iconMatch) {
+        continue;
+      }
+
+      const iconLocal = iconMatch[2];
       const symbol = symbols.items[iconLocal];
       if (
         !symbol ||
@@ -438,7 +495,7 @@ const scanJsxReferencePropEdits = (
         continue;
       }
 
-      const iconLocalStart = cursor + match.index + match[1].length;
+      const iconLocalStart = valueStart + 1 + iconMatch[1].length;
       edits.push({
         type: 'replace',
         from: iconLocalStart,
@@ -453,6 +510,59 @@ const scanJsxReferencePropEdits = (
   }
 
   return { edits, count };
+};
+
+const isJsxAttributeNamePart = (char: string | undefined): boolean => {
+  return isIdentifierPart(char) || char === '-' || char === '.' || char === ':';
+};
+
+const skipQuotedString = (code: string, start: number): number => {
+  const quote = code[start];
+  let cursor = start + 1;
+  while (cursor < code.length) {
+    if (code[cursor] === '\\') {
+      cursor += 2;
+      continue;
+    }
+    if (code[cursor] === quote) {
+      return cursor + 1;
+    }
+    cursor += 1;
+  }
+  return code.length;
+};
+
+const findJsxExpressionEnd = (code: string, start: number): number => {
+  let quote: string | null = null;
+  let braceDepth = 0;
+  for (let index = start; index < code.length; index += 1) {
+    const char = code[index];
+    if (quote) {
+      if (char === '\\') {
+        index += 1;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '{') {
+      braceDepth += 1;
+      continue;
+    }
+    if (char === '}') {
+      braceDepth -= 1;
+      if (braceDepth === 0) {
+        return index;
+      }
+    }
+  }
+  return -1;
 };
 
 const hasIconIdAttribute = (
