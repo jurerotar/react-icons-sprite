@@ -456,4 +456,23 @@ describe('transformModule', () => {
     expect(result.code).toBe(input);
     expect(used).toEqual([]);
   });
+
+  test('rewrites custom icon imports when the configured path matches exactly', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { CustomSearch } from "@/icons";\nexport const A = () => <CustomSearch />;`;
+
+    const result = transformModule(
+      input,
+      'file.tsx',
+      (pack, exportName) => {
+        used.push({ pack, exportName });
+      },
+      [/^@\/icons$/],
+    );
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain('iconId="ri-icons-CustomSearch"');
+    expect(result.code).not.toContain('from "@/icons"');
+    expect(used).toEqual([{ pack: '@/icons', exportName: 'CustomSearch' }]);
+  });
 });

@@ -1,24 +1,22 @@
 import type { Plugin } from 'vite';
 import { createHash } from 'node:crypto';
 import { createCollector } from '../collector/create-collector';
-import { DEFAULT_ICON_SOURCES } from '../packs/icon-resolvers';
+import {
+  createIconSources,
+  createSpriteAssetName,
+  type ReactIconsSpritePluginOptions,
+} from '../plugin-options';
 import { buildSprite } from '../sprite/build-sprite';
 import { transformModule } from '../transform/transform-module';
 import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 
-export type ReactIconsSpriteVitePluginOptions = {
-  /**
-   * If passed, this exact string will be used for the emitted file name.
-   * If fileName is omitted, name will be generated as `react-icons-sprite-[hash].svg.
-   * This is useful when, for example, multiple sprite sheets are generated during client and server builds.
-   */
-  fileName?: string;
-};
+export type ReactIconsSpriteVitePluginOptions = ReactIconsSpritePluginOptions;
 
 export const reactIconsSprite = (
   options: ReactIconsSpriteVitePluginOptions = {},
 ): Plugin => {
-  const { fileName } = options;
+  const { outputDir } = options;
+  const iconSources = createIconSources();
 
   const collector = createCollector();
   let root = process.cwd();
@@ -36,7 +34,7 @@ export const reactIconsSprite = (
       root = config.root;
     },
 
-    transform(code, id) {
+    async transform(code, id) {
       const cleanId = id.split('?', 1)[0];
       if (!/\.(mjs|cjs|js|jsx|ts|tsx)$/.test(cleanId)) {
         return null;
@@ -51,9 +49,11 @@ export const reactIconsSprite = (
           code,
           id,
           (pack, exportName) => {
-            collector.add(pack, exportName);
+            collector.add(pack, exportName, {
+              importer: cleanId,
+            });
           },
-          DEFAULT_ICON_SOURCES,
+          iconSources,
         );
         if (!anyReplacements) {
           return null;
@@ -79,9 +79,10 @@ export const reactIconsSprite = (
         .digest('hex')
         .slice(0, 8);
 
-      const fileNameToEmit = fileName
-        ? fileName
-        : `react-icons-sprite-${generatedHash}.svg`;
+      const fileNameToEmit = createSpriteAssetName(
+        `react-icons-sprite-${generatedHash}.svg`,
+        outputDir,
+      );
 
       const emitFileOptions: Parameters<typeof this.emitFile>[0] = {
         type: 'asset',

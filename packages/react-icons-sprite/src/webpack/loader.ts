@@ -1,5 +1,6 @@
 import { transformModule } from '../transform/transform-module';
 import { collector } from '../collector';
+import { createIconSources } from '../plugin-options';
 import type { LoaderDefinitionFunction } from 'webpack';
 
 const reactIconsSpriteLoader: LoaderDefinitionFunction = async function (
@@ -17,12 +18,15 @@ const reactIconsSpriteLoader: LoaderDefinitionFunction = async function (
       return source;
     }
 
+    const iconSources = createIconSources();
+
     const { code, anyReplacements } = transformModule(
       String(source),
       id,
       (pack, exportName) => {
-        collector.add(pack, exportName);
+        collector.add(pack, exportName, { importer: id });
       },
+      iconSources,
     );
 
     if (!anyReplacements) {

@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.schemastore.org/package.json",
   "name": "react-icons-sprite",
-  "version": "1.2.0-rc.2",
+  "version": "1.2.0-rc.3",
   "type": "module",
   "description": "A lightweight Vite, Rsbuild and Webpack plugin for react-icons that builds a single SVG sprite and rewrites icons to <use>, reducing bundle size and runtime overhead.",
   "author": "Jure Rotar <hello@jurerotar.com>",
@@ -88,18 +88,18 @@
     "react-dom": ">= 16"
   },
   "dependencies": {
-    "magic-string": "0.30.21"
+    "magic-string": "1.1.0"
   },
   "devDependencies": {
-    "@types/node": "26.1.1",
-    "@types/react-dom": "19.2.3",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
-    "tsdown": "0.22.7",
+    "@types/node": "26.2.0",
+    "@types/react-dom": "19.2.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tsdown": "0.22.14",
     "typescript": "7.0.2",
-    "vite": "8.1.4",
+    "vite": "8.2.1",
     "vitest": "4.1.10",
-    "webpack": "5.108.4"
+    "webpack": "5.109.2"
   },
   "keywords": [
     "vite",

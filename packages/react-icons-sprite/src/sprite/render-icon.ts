@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createElement, type ComponentType } from 'react';
@@ -26,6 +26,8 @@ type PackageJson = {
 
 type RenderIconOptions = {
   baseDir?: string;
+  importer?: string;
+  importPath?: string;
 };
 
 const parsePackageSpecifier = (
@@ -126,15 +128,29 @@ const resolveExportTarget = (
   return null;
 };
 
-const fileExists = (filePath: string): boolean => existsSync(filePath);
+const fileExists = (filePath: string): boolean => {
+  try {
+    return statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+};
 
 const resolveFileCandidate = (filePath: string): string | null => {
   const candidates = [
     filePath,
     `${filePath}.mjs`,
     `${filePath}.js`,
+    `${filePath}.cjs`,
+    `${filePath}.jsx`,
+    `${filePath}.ts`,
+    `${filePath}.tsx`,
     path.join(filePath, 'index.mjs'),
     path.join(filePath, 'index.js'),
+    path.join(filePath, 'index.cjs'),
+    path.join(filePath, 'index.jsx'),
+    path.join(filePath, 'index.ts'),
+    path.join(filePath, 'index.tsx'),
   ];
 
   return candidates.find(fileExists) ?? null;
@@ -180,6 +196,21 @@ const resolveImportSpecifier = (
   specifier: string,
   options: RenderIconOptions,
 ): string => {
+  if (path.isAbsolute(specifier)) {
+    const resolved = resolveFileCandidate(specifier);
+    return pathToFileURL(resolved ?? specifier).href;
+  }
+
+  if (specifier.startsWith('.') && options.importer) {
+    const importerPath = options.importer.split('?', 1)[0];
+    const resolved = resolveFileCandidate(
+      path.resolve(path.dirname(importerPath), specifier),
+    );
+    if (resolved) {
+      return pathToFileURL(resolved).href;
+    }
+  }
+
   if (!options.baseDir) {
     return specifier;
   }
@@ -353,7 +384,7 @@ export const renderIcon = async (
   exportName: string,
   options: RenderIconOptions = {},
 ): Promise<RenderedIcon> => {
-  const importPath = resolveIconImport(pack, exportName);
+  const importPath = options.importPath ?? resolveIconImport(pack, exportName);
   const imported = (await import(
     resolveImportSpecifier(importPath, options)
   )) as Record<string, unknown>;
