@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { fileURLToPath } from 'node:url';
 import { forwardRef } from 'react';
 import {
   extractSymbolAttributes,
@@ -93,6 +94,20 @@ describe('renderIcon', () => {
     );
 
     expect(rendered.viewBox).toBe('0 0 24 24');
+    expect(rendered.symbolAttributes).toContain('fill="none"');
+    expect(rendered.symbolBody).toContain('<path');
+  });
+
+  test('renders a custom relative icon module in react-icons/lucide shape', async () => {
+    const rendered = await renderIcon(
+      './fixtures/custom-icons.mjs',
+      'CustomSearch',
+      {
+        importer: fileURLToPath(import.meta.url),
+      },
+    );
+
+    expect(rendered.viewBox).toBe('0 0 16 16');
     expect(rendered.symbolAttributes).toContain('fill="none"');
     expect(rendered.symbolBody).toContain('<path');
   });

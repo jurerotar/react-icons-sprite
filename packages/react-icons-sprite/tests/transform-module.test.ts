@@ -63,6 +63,135 @@ describe('transformModule', () => {
     ]);
   });
 
+  test('rewrites component reference prop usage to a sprite component factory and registers icon', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { X } from "lucide-react";\nexport const A = () => <Button closeIcon={X} />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain('ReactIconsSpriteIcon');
+    expect(result.code).toContain(
+      'closeIcon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-X" />}',
+    );
+    expect(result.code).not.toContain('closeIcon={X}');
+    expect(result.code).not.toContain('import { X } from "lucide-react"');
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'X' }]);
+  });
+
+  test('rewrites reference prop usage before removing an import used by icon components', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { Circle, X } from "lucide-react";\nexport const A = () => <Button suffix={X}><Circle /></Button>;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain('iconId="ri-lucide-react-Circle"');
+    expect(result.code).toContain(
+      'suffix={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-X" />}',
+    );
+    expect(result.code).not.toContain('suffix={X}');
+    expect(result.code).not.toContain('from "lucide-react"');
+    expect(used).toEqual([
+      { pack: 'lucide-react', exportName: 'Circle' },
+      { pack: 'lucide-react', exportName: 'X' },
+    ]);
+  });
+
+  test('keeps icon import when a rewritten component is still referenced elsewhere', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { Circle, X } from "lucide-react";\nconst CloseIcon = X;\nexport const A = () => <><Circle /><X /></>;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain('import { X } from "lucide-react";');
+    expect(result.code).not.toContain('import { Circle');
+    expect(result.code).toContain('const CloseIcon = X;');
+    expect(result.code).toContain('iconId="ri-lucide-react-Circle"');
+    expect(result.code).toContain('iconId="ri-lucide-react-X"');
+    expect(used).toEqual([
+      { pack: 'lucide-react', exportName: 'Circle' },
+      { pack: 'lucide-react', exportName: 'X' },
+    ]);
+  });
+
+  test('does not keep icon import for references that only remain in strings or comments', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { X } from "lucide-react";\nconst label = "X";\n// X is used as an icon below\nexport const A = () => <X />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).not.toContain('from "lucide-react"');
+    expect(result.code).toContain('const label = "X";');
+    expect(result.code).toContain('// X is used as an icon below');
+    expect(result.code).toContain('iconId="ri-lucide-react-X"');
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'X' }]);
+  });
+
+  test('handles dollar-prefixed icon import locals when checking leftover references', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { X as $CloseIcon } from "lucide-react";\nexport const A = () => <Button closeIcon={$CloseIcon} />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).not.toContain('from "lucide-react"');
+    expect(result.code).toContain(
+      'closeIcon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-X" />}',
+    );
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'X' }]);
+  });
+
+  test('uses existing aliased sprite import for component reference prop usage', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { ReactIconsSpriteIcon as Icon } from "react-icons-sprite";\nimport { X } from "lucide-react";\nexport const A = () => <Button closeIcon={X} />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain(
+      'closeIcon={(props) => <Icon {...props} iconId="ri-lucide-react-X" />}',
+    );
+    expect(result.code).not.toContain('<ReactIconsSpriteIcon');
+    expect(result.code.match(/from "react-icons-sprite"/g)).toHaveLength(1);
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'X' }]);
+  });
+
+  test('does not duplicate reference prop rewrites from nested JSX inside attributes', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { ChevronDown } from "lucide-react";\nexport const A = () => <Menu trigger={<IconButton icon={ChevronDown} />} />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain(
+      'icon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-ChevronDown" />}',
+    );
+    expect(result.code.match(/ri-lucide-react-ChevronDown/g)).toHaveLength(1);
+    expect(result.code).not.toContain('icon={ChevronDown}');
+    expect(result.code).not.toContain(
+      '(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-ChevronDown" />\n  (props)',
+    );
+    expect(result.code).not.toContain('from "lucide-react"');
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'ChevronDown' }]);
+  });
+
   test('rewrites Hugeicons icon object usage to sprite component and registers icon', () => {
     const used: Array<{ pack: string; exportName: string }> = [];
     const input = `import { HugeiconsIcon } from "@hugeicons/react";\nimport { GlobalSearchIcon } from "@hugeicons/core-free-icons";\nexport const A = () => <HugeiconsIcon icon={GlobalSearchIcon} width={32} height={32} />;`;
@@ -326,5 +455,24 @@ describe('transformModule', () => {
     expect(result.anyReplacements).toBe(false);
     expect(result.code).toBe(input);
     expect(used).toEqual([]);
+  });
+
+  test('rewrites custom icon imports when the configured path matches exactly', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { CustomSearch } from "@/icons";\nexport const A = () => <CustomSearch />;`;
+
+    const result = transformModule(
+      input,
+      'file.tsx',
+      (pack, exportName) => {
+        used.push({ pack, exportName });
+      },
+      [/^@\/icons$/],
+    );
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain('iconId="ri-icons-CustomSearch"');
+    expect(result.code).not.toContain('from "@/icons"');
+    expect(used).toEqual([{ pack: '@/icons', exportName: 'CustomSearch' }]);
   });
 });

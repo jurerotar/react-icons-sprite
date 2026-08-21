@@ -2,22 +2,20 @@ import { createHash } from 'node:crypto';
 import { buildSprite } from '../sprite/build-sprite';
 import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 import { collector } from '../collector';
+import {
+  createSpriteAssetName,
+  type ReactIconsSpritePluginOptions,
+} from '../plugin-options';
 import type { Compiler, Compilation } from 'webpack';
 
-export type ReactIconsSpriteWebpackPluginOptions = {
-  /**
-   * If passed, this exact string will be used for the emitted file name.
-   * If fileName is omitted, name will be generated as `react-icons-sprite-[hash].svg`.
-   * This is useful when, for example, multiple sprite sheets are generated during client and server builds.
-   */
-  fileName?: string;
-};
+export type ReactIconsSpriteWebpackPluginOptions =
+  ReactIconsSpritePluginOptions;
 
 export class ReactIconsSpriteWebpackPlugin {
-  private readonly fileName?: string;
+  private readonly outputDir?: string;
 
   constructor(options: ReactIconsSpriteWebpackPluginOptions = {}) {
-    this.fileName = options.fileName;
+    this.outputDir = options.outputDir;
   }
 
   apply(compiler: Compiler): void {
@@ -50,8 +48,10 @@ export class ReactIconsSpriteWebpackPlugin {
               .digest('hex')
               .slice(0, 8);
 
-            const name =
-              this.fileName ?? `react-icons-sprite-${generatedHash}.svg`;
+            const name = createSpriteAssetName(
+              `react-icons-sprite-${generatedHash}.svg`,
+              this.outputDir,
+            );
 
             const RawSource = compiler.webpack?.sources?.RawSource;
             if (!RawSource) {

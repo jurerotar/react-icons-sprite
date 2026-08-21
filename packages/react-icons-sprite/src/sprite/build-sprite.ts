@@ -15,9 +15,11 @@ export const buildSprite = async (
   }
 
   const symbols = await Promise.all(
-    icons.map(async ({ pack, exportName }) => {
+    icons.map(async ({ pack, exportName, importer, importPath }) => {
       const rendered = await renderIcon(pack, exportName, {
         baseDir: options.baseDir,
+        importer,
+        importPath,
       });
       const id = computeIconId(pack, exportName);
       const symbolAttributes = rendered.symbolAttributes

@@ -284,6 +284,11 @@ type JsxIconEditScan = {
   count: number;
 };
 
+type JsxReferencePropEditScan = {
+  edits: EditOperation[];
+  count: number;
+};
+
 const scanJsxIconEdits = (
   code: string,
   symbols: IconSymbolTable,
@@ -364,6 +369,200 @@ const scanJsxIconEdits = (
   }
 
   return { edits, count };
+};
+
+const scanJsxReferencePropEdits = (
+  code: string,
+  symbols: IconSymbolTable,
+  componentName: string,
+  usedSymbols: Set<string>,
+  register: (pack: string, exportName: string) => void,
+  ignoredComponentLocals: Set<string>,
+): JsxReferencePropEditScan => {
+  if (symbols.size === 0) {
+    return { edits: [], count: 0 };
+  }
+
+  const edits: EditOperation[] = [];
+  let count = 0;
+
+  for (
+    let index = code.indexOf('<');
+    index !== -1;
+    index = code.indexOf('<', index + 1)
+  ) {
+    let cursor = index + 1;
+    while (isWhitespace(code[cursor])) {
+      cursor += 1;
+    }
+
+    if (code[cursor] === '/') {
+      continue;
+    }
+
+    if (!isIdentifierStart(code[cursor])) {
+      continue;
+    }
+
+    const componentStart = cursor;
+    cursor += 1;
+    while (isIdentifierPart(code[cursor])) {
+      cursor += 1;
+    }
+
+    const componentLocal = code.slice(componentStart, cursor);
+    if (
+      symbols.items[componentLocal] ||
+      ignoredComponentLocals.has(componentLocal)
+    ) {
+      continue;
+    }
+
+    const tagEnd = findJsxOpeningTagEnd(code, cursor);
+    if (tagEnd === -1) {
+      continue;
+    }
+
+    let attributeCursor = cursor;
+    while (attributeCursor < tagEnd) {
+      while (isWhitespace(code[attributeCursor])) {
+        attributeCursor += 1;
+      }
+
+      if (attributeCursor >= tagEnd || code[attributeCursor] === '/') {
+        break;
+      }
+
+      if (code[attributeCursor] === '{') {
+        const expressionEnd = findJsxExpressionEnd(code, attributeCursor);
+        attributeCursor = expressionEnd === -1 ? tagEnd : expressionEnd + 1;
+        continue;
+      }
+
+      if (!isIdentifierStart(code[attributeCursor])) {
+        attributeCursor += 1;
+        continue;
+      }
+
+      attributeCursor += 1;
+      while (isJsxAttributeNamePart(code[attributeCursor])) {
+        attributeCursor += 1;
+      }
+
+      while (isWhitespace(code[attributeCursor])) {
+        attributeCursor += 1;
+      }
+
+      if (code[attributeCursor] !== '=') {
+        continue;
+      }
+
+      attributeCursor += 1;
+      while (isWhitespace(code[attributeCursor])) {
+        attributeCursor += 1;
+      }
+
+      const valueStart = attributeCursor;
+      if (code[valueStart] === '"' || code[valueStart] === "'") {
+        attributeCursor = skipQuotedString(code, valueStart);
+        continue;
+      }
+
+      if (code[valueStart] !== '{') {
+        continue;
+      }
+
+      const expressionEnd = findJsxExpressionEnd(code, valueStart);
+      if (expressionEnd === -1 || expressionEnd > tagEnd) {
+        attributeCursor = tagEnd;
+        continue;
+      }
+
+      attributeCursor = expressionEnd + 1;
+      const expression = code.slice(valueStart + 1, expressionEnd);
+      const iconMatch = /^(\s*)([A-Za-z_$][\w$]*)(\s*)$/.exec(expression);
+      if (!iconMatch) {
+        continue;
+      }
+
+      const iconLocal = iconMatch[2];
+      const symbol = symbols.items[iconLocal];
+      if (
+        !symbol ||
+        isFontAwesomeIconPack(symbol.pack) ||
+        isHugeiconsIconPack(symbol.pack)
+      ) {
+        continue;
+      }
+
+      const iconLocalStart = valueStart + 1 + iconMatch[1].length;
+      edits.push({
+        type: 'replace',
+        from: iconLocalStart,
+        to: iconLocalStart + iconLocal.length,
+        value: `(props) => <${componentName} {...props} iconId="${symbol.iconId}" />`,
+      });
+
+      count += 1;
+      usedSymbols.add(iconLocal);
+      register(symbol.pack, symbol.exportName);
+    }
+  }
+
+  return { edits, count };
+};
+
+const isJsxAttributeNamePart = (char: string | undefined): boolean => {
+  return isIdentifierPart(char) || char === '-' || char === '.' || char === ':';
+};
+
+const skipQuotedString = (code: string, start: number): number => {
+  const quote = code[start];
+  let cursor = start + 1;
+  while (cursor < code.length) {
+    if (code[cursor] === '\\') {
+      cursor += 2;
+      continue;
+    }
+    if (code[cursor] === quote) {
+      return cursor + 1;
+    }
+    cursor += 1;
+  }
+  return code.length;
+};
+
+const findJsxExpressionEnd = (code: string, start: number): number => {
+  let quote: string | null = null;
+  let braceDepth = 0;
+  for (let index = start; index < code.length; index += 1) {
+    const char = code[index];
+    if (quote) {
+      if (char === '\\') {
+        index += 1;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '{') {
+      braceDepth += 1;
+      continue;
+    }
+    if (char === '}') {
+      braceDepth -= 1;
+      if (braceDepth === 0) {
+        return index;
+      }
+    }
+  }
+  return -1;
 };
 
 const hasIconIdAttribute = (
@@ -798,6 +997,134 @@ const consumeTrailingWhitespace = (code: string, start: number): number => {
   return to;
 };
 
+const editRange = (edit: EditOperation): NodeRange | null => {
+  if (edit.type === 'insert') {
+    return null;
+  }
+  return [edit.from, edit.to];
+};
+
+const rangeContains = ([start, end]: NodeRange, index: number): boolean => {
+  return index >= start && index < end;
+};
+
+const collectUsedLocalsOutsideRanges = (
+  code: string,
+  usedLocals: Set<string>,
+  ignoredRanges: NodeRange[],
+): Set<string> => {
+  const ranges = [...ignoredRanges].sort((left, right) => left[0] - right[0]);
+  const found = new Set<string>();
+  let rangeIndex = 0;
+  let quote: '"' | "'" | null = null;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let index = 0; index < code.length; index += 1) {
+    while (rangeIndex < ranges.length && ranges[rangeIndex][1] <= index) {
+      rangeIndex += 1;
+    }
+    const ignoredRange = ranges[rangeIndex];
+    if (ignoredRange && rangeContains(ignoredRange, index)) {
+      index = ignoredRange[1] - 1;
+      continue;
+    }
+
+    const char = code[index];
+    const next = code[index + 1];
+
+    if (lineComment) {
+      if (char === '\n' || char === '\r') {
+        lineComment = false;
+      }
+      continue;
+    }
+
+    if (blockComment) {
+      if (char === '*' && next === '/') {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+
+    if (quote) {
+      if (char === '\\') {
+        index += 1;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === '/' && next === '/') {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+
+    if (char === '/' && next === '*') {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+
+    if (!isIdentifierStart(char)) {
+      continue;
+    }
+
+    const start = index;
+    index += 1;
+    while (isIdentifierPart(code[index])) {
+      index += 1;
+    }
+
+    const local = code.slice(start, index);
+    if (usedLocals.has(local)) {
+      found.add(local);
+    }
+    index -= 1;
+  }
+
+  return found;
+};
+
+const filterRemovableUsedLocals = (
+  code: string,
+  imports: ScannedImport[],
+  usedLocals: Set<string>,
+  usageEdits: EditOperation[],
+): Set<string> => {
+  const ignoredRanges = [
+    ...imports.map((item) => item.declarationRange),
+    ...usageEdits.flatMap((edit) => {
+      const range = editRange(edit);
+      return range ? [range] : [];
+    }),
+  ];
+  const liveLocals = collectUsedLocalsOutsideRanges(
+    code,
+    usedLocals,
+    ignoredRanges,
+  );
+
+  const removable = new Set<string>();
+  for (const local of usedLocals) {
+    if (!liveLocals.has(local)) {
+      removable.add(local);
+    }
+  }
+
+  return removable;
+};
+
 export const transformModule = (
   code: string,
   id: string,
@@ -832,8 +1159,18 @@ export const transformModule = (
     ? scanSpriteIconImport(code)
     : { hasImport: false, localName: ICON_COMPONENT_NAME };
   const used = new Set<string>();
+  const fontAwesomeComponents = hasPotentialFontAwesomeUsage
+    ? scanFontAwesomeComponents(code)
+    : new Set<string>();
+  const hugeiconsComponents = hasPotentialHugeiconsUsage
+    ? scanHugeiconsComponents(code)
+    : new Set<string>();
   const usedFontAwesomeComponents = new Set<string>();
   const usedHugeiconsComponents = new Set<string>();
+  const ignoredIconPropComponentLocals = new Set([
+    ...fontAwesomeComponents,
+    ...hugeiconsComponents,
+  ]);
   const jsxScan = scanJsxIconEdits(
     code,
     table,
@@ -842,22 +1179,31 @@ export const transformModule = (
     register,
     code.includes('iconId'),
   );
+  const referencePropScan = scanJsxReferencePropEdits(
+    code,
+    table,
+    spriteIconImport.localName,
+    used,
+    register,
+    ignoredIconPropComponentLocals,
+  );
   const fontAwesomeUsages = hasPotentialFontAwesomeUsage
-    ? scanFontAwesomeUsages(code, table, scanFontAwesomeComponents(code))
+    ? scanFontAwesomeUsages(code, table, fontAwesomeComponents)
     : [];
   const hugeiconsUsages = hasPotentialHugeiconsUsage
-    ? scanHugeiconsUsages(code, table, scanHugeiconsComponents(code))
+    ? scanHugeiconsUsages(code, table, hugeiconsComponents)
     : [];
 
   if (
     jsxScan.count === 0 &&
+    referencePropScan.count === 0 &&
     !fontAwesomeUsages.length &&
     !hugeiconsUsages.length
   ) {
     return { code, map: null, anyReplacements: false };
   }
 
-  const edits = jsxScan.edits;
+  const edits = [...jsxScan.edits, ...referencePropScan.edits];
   const registeredFontAwesomeIcons = new Set<string>();
 
   for (const usage of fontAwesomeUsages) {
@@ -920,7 +1266,17 @@ export const transformModule = (
     }
   }
 
-  const cleanupEdits = cleanupScannedImports(code, scannedImports, used);
+  const removableUsed = filterRemovableUsedLocals(
+    code,
+    scannedImports,
+    used,
+    edits,
+  );
+  const cleanupEdits = cleanupScannedImports(
+    code,
+    scannedImports,
+    removableUsed,
+  );
   const cleanupFontAwesomeEdits = usedFontAwesomeComponents.size
     ? cleanupScannedFontAwesomeComponentImports(code, usedFontAwesomeComponents)
     : [];
@@ -929,7 +1285,9 @@ export const transformModule = (
     : [];
 
   const canUsePresortedEdits =
-    cleanupFontAwesomeEdits.length === 0 && cleanupHugeiconsEdits.length === 0;
+    referencePropScan.count === 0 &&
+    cleanupFontAwesomeEdits.length === 0 &&
+    cleanupHugeiconsEdits.length === 0;
   const allEdits = canUsePresortedEdits
     ? [...cleanupEdits, ...edits]
     : [

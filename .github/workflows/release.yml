@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -31,5 +31,26 @@ jobs:
       - name: Build package
         run: npm run build --workspace react-icons-sprite
 
+      - name: Resolve npm dist tag
+        id: npm-tag
+        run: |
+          version="$(node -p "require('./packages/react-icons-sprite/package.json').version")"
+          prerelease="${version#*-}"
+          if [ "$prerelease" = "$version" ]; then
+            tag="latest"
+          elif [[ "$prerelease" =~ ^rc[0-9]*([.-].*)?$ ]]; then
+            tag="rc"
+          else
+            tag="${prerelease%%[.-]*}"
+          fi
+          if [[ ! "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "Invalid npm dist-tag: $tag" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Publishing react-icons-sprite@$version with npm dist-tag '$tag'"
+
       - name: Publish package with provenance
-        run: npm publish --workspace react-icons-sprite --access public
+        env:
+          NPM_DIST_TAG: ${{ steps.npm-tag.outputs.tag }}
+        run: npm publish --workspace react-icons-sprite --access public --tag "$NPM_DIST_TAG"
