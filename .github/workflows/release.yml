@@ -43,8 +43,14 @@ jobs:
           else
             tag="${prerelease%%[.-]*}"
           fi
+          if [[ ! "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "Invalid npm dist-tag: $tag" >&2
+            exit 1
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Publishing react-icons-sprite@$version with npm dist-tag '$tag'"
 
       - name: Publish package with provenance
-        run: npm publish --workspace react-icons-sprite --access public --tag "${{ steps.npm-tag.outputs.tag }}"
+        env:
+          NPM_DIST_TAG: ${{ steps.npm-tag.outputs.tag }}
+        run: npm publish --workspace react-icons-sprite --access public --tag "$NPM_DIST_TAG"
