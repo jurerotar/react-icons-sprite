@@ -1,11 +1,17 @@
 name: release
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "current, a version bump, or an exact version, e.g. patch, minor, major, 1.2.0, 1.2.0-rc.1"
+        required: true
+        default: "current"
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,18 +29,62 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup environment (node + install)
         uses: ./.github/actions/node-setup
+
+      - name: Configure npm registry
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 'lts/*'
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Configure Git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Prepare package version
+        id: version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$RELEASE_VERSION" =~ ^(current|major|minor|patch|premajor|preminor|prepatch|prerelease|[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?)$ ]]; then
+            echo "Invalid release version: $RELEASE_VERSION" >&2
+            exit 1
+          fi
+
+          if [ "$RELEASE_VERSION" != "current" ]; then
+            npm version "$RELEASE_VERSION" --workspace react-icons-sprite --no-git-tag-version
+          fi
+
+          version="$(node -p "require('./packages/react-icons-sprite/package.json').version")"
+          tag_name="$version"
+
+          if git rev-parse "$tag_name" >/dev/null 2>&1; then
+            echo "Git tag already exists: $tag_name" >&2
+            exit 1
+          fi
+
+          if npm view "react-icons-sprite@$version" version >/dev/null 2>&1; then
+            echo "npm version already exists: react-icons-sprite@$version" >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
 
       - name: Build package
         run: npm run build --workspace react-icons-sprite
 
       - name: Resolve npm dist tag
         id: npm-tag
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version="$(node -p "require('./packages/react-icons-sprite/package.json').version")"
+          version="$PACKAGE_VERSION"
           prerelease="${version#*-}"
           if [ "$prerelease" = "$version" ]; then
             tag="latest"
@@ -50,7 +100,41 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Publishing react-icons-sprite@$version with npm dist-tag '$tag'"
 
+      - name: Commit and tag release
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag_name }}
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git add package-lock.json packages/react-icons-sprite/package.json
+          if git diff --cached --quiet; then
+            echo "No version files changed; tagging current commit."
+            git tag "$RELEASE_TAG"
+            git push origin "$RELEASE_TAG"
+          else
+            git commit -m "chore: release react-icons-sprite@$PACKAGE_VERSION"
+            git tag "$RELEASE_TAG"
+            git push origin "HEAD:$GITHUB_REF_NAME" "$RELEASE_TAG"
+          fi
+
       - name: Publish package with provenance
         env:
           NPM_DIST_TAG: ${{ steps.npm-tag.outputs.tag }}
-        run: npm publish --workspace react-icons-sprite --access public --tag "$NPM_DIST_TAG"
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --workspace react-icons-sprite --access public --tag "$NPM_DIST_TAG" --provenance
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag_name }}
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          release_flags=()
+          if [[ "$PACKAGE_VERSION" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            --title "react-icons-sprite@$PACKAGE_VERSION" \
+            --generate-notes \
+            --verify-tag \
+            "${release_flags[@]}"
