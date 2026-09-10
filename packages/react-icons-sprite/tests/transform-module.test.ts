@@ -102,6 +102,79 @@ describe('transformModule', () => {
     ]);
   });
 
+  test('removes a shared icon import when JSX and component prop usages are mixed', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { Button, Typography } from "@povio/ui";\nimport { FileJson, RotateCcw, Upload } from "lucide-react";\n\nexport function Example() {\n  return (\n    <>\n      <FileJson size={18} />\n\n      <Button icon={Upload}>\n        Upload JSON\n      </Button>\n\n      <Button icon={RotateCcw}>\n        Reset\n      </Button>\n    </>\n  );\n}`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain(
+      'import { Button, Typography } from "@povio/ui";',
+    );
+    expect(result.code).not.toContain('from "lucide-react"');
+    expect(result.code).not.toContain('import { , Upload }');
+    expect(result.code).toContain('iconId="ri-lucide-react-FileJson"');
+    expect(result.code).toContain(
+      'icon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-Upload" />}',
+    );
+    expect(result.code).toContain(
+      'icon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-RotateCcw" />}',
+    );
+    expect(used).toEqual([
+      { pack: 'lucide-react', exportName: 'FileJson' },
+      { pack: 'lucide-react', exportName: 'Upload' },
+      { pack: 'lucide-react', exportName: 'RotateCcw' },
+    ]);
+  });
+
+  test('keeps valid import syntax when removing consecutive leading specifiers', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { FileJson, RotateCcw, Upload } from "lucide-react";\nconst uploadIcon = Upload;\nexport const A = () => <><FileJson /><Button icon={RotateCcw} /></>;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain('import { Upload } from "lucide-react";');
+    expect(result.code).not.toContain('import { , Upload }');
+    expect(result.code).toContain('const uploadIcon = Upload;');
+    expect(result.code).toContain('iconId="ri-lucide-react-FileJson"');
+    expect(result.code).toContain(
+      'icon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-RotateCcw" />}',
+    );
+    expect(used).toEqual([
+      { pack: 'lucide-react', exportName: 'FileJson' },
+      { pack: 'lucide-react', exportName: 'RotateCcw' },
+    ]);
+  });
+
+  test('keeps valid import syntax when named specifiers share a default import', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import DefaultIcon, { RotateCcw, Upload } from "lucide-react";\nconst uploadIcon = Upload;\nexport const A = () => <><DefaultIcon /><Button icon={RotateCcw} /></>;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain('import { Upload } from "lucide-react";');
+    expect(result.code).not.toContain('DefaultIcon,');
+    expect(result.code).not.toContain('import { RotateCcw');
+    expect(result.code).toContain('const uploadIcon = Upload;');
+    expect(result.code).toContain('iconId="ri-lucide-react-default"');
+    expect(result.code).toContain(
+      'icon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-RotateCcw" />}',
+    );
+    expect(used).toEqual([
+      { pack: 'lucide-react', exportName: 'default' },
+      { pack: 'lucide-react', exportName: 'RotateCcw' },
+    ]);
+  });
+
   test('keeps icon import when a rewritten component is still referenced elsewhere', () => {
     const used: Array<{ pack: string; exportName: string }> = [];
     const input = `import { Circle, X } from "lucide-react";\nconst CloseIcon = X;\nexport const A = () => <><Circle /><X /></>;`;
@@ -136,6 +209,42 @@ describe('transformModule', () => {
     expect(result.code).toContain('// X is used as an icon below');
     expect(result.code).toContain('iconId="ri-lucide-react-X"');
     expect(used).toEqual([{ pack: 'lucide-react', exportName: 'X' }]);
+  });
+
+  test('does not keep icon import for references that only remain in template text', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input =
+      'import { Upload } from "lucide-react";\nconst label = `Upload JSON`;\nexport const A = () => <Button icon={Upload} />;';
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).not.toContain('from "lucide-react"');
+    expect(result.code).toContain('const label = `Upload JSON`;');
+    expect(result.code).toContain(
+      'icon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-Upload" />}',
+    );
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'Upload' }]);
+  });
+
+  test('keeps icon import for references inside template expressions', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const expression = '$' + '{Upload}';
+    const input = `import { Upload } from "lucide-react";\nconst label = \`${expression}\`;\nexport const A = () => <Button icon={Upload} />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain('import { Upload } from "lucide-react";');
+    expect(result.code).toContain(`const label = \`${expression}\`;`);
+    expect(result.code).toContain(
+      'icon={(props) => <ReactIconsSpriteIcon {...props} iconId="ri-lucide-react-Upload" />}',
+    );
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'Upload' }]);
   });
 
   test('handles dollar-prefixed icon import locals when checking leftover references', () => {
@@ -436,6 +545,62 @@ describe('transformModule', () => {
     expect(result.code).not.toContain('FontAwesomeIcon');
     expect(used).toEqual([
       { pack: '@fortawesome/free-solid-svg-icons', exportName: 'faUser' },
+    ]);
+  });
+
+  test('keeps valid FontAwesome component import syntax when multiple aliases are removed', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import ReactDefault, { FontAwesomeIcon, FontAwesomeIcon as FA, SomethingElse } from "@fortawesome/react-fontawesome";\nimport { faUser, faHome } from "@fortawesome/free-solid-svg-icons";\nconst kept = [ReactDefault, SomethingElse];\nexport const A = () => <><FontAwesomeIcon icon={faUser} /><FA icon={faHome} /></>;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain(
+      'import ReactDefault, { SomethingElse } from "@fortawesome/react-fontawesome";',
+    );
+    expect(result.code).not.toContain('FontAwesomeIcon, SomethingElse');
+    expect(result.code).not.toContain('FA, SomethingElse');
+    expect(result.code).toContain(
+      'const kept = [ReactDefault, SomethingElse];',
+    );
+    expect(result.code).toContain(
+      'iconId="ri-fortawesome-free-solid-svg-icons-faUser"',
+    );
+    expect(result.code).toContain(
+      'iconId="ri-fortawesome-free-solid-svg-icons-faHome"',
+    );
+    expect(used).toEqual([
+      { pack: '@fortawesome/free-solid-svg-icons', exportName: 'faUser' },
+      { pack: '@fortawesome/free-solid-svg-icons', exportName: 'faHome' },
+    ]);
+  });
+
+  test('keeps valid Hugeicons component import syntax when multiple aliases are removed', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import HugeDefault, { HugeiconsIcon, HugeiconsIcon as HI, SomethingElse } from "@hugeicons/react";\nimport { SearchIcon, HomeIcon } from "@hugeicons/core-free-icons";\nconst kept = [HugeDefault, SomethingElse];\nexport const A = () => <><HugeiconsIcon icon={SearchIcon} /><HI icon={HomeIcon} /></>;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain(
+      'import HugeDefault, { SomethingElse } from "@hugeicons/react";',
+    );
+    expect(result.code).not.toContain('HugeiconsIcon, SomethingElse');
+    expect(result.code).not.toContain('HI, SomethingElse');
+    expect(result.code).toContain('const kept = [HugeDefault, SomethingElse];');
+    expect(result.code).toContain(
+      'iconId="ri-hugeicons-core-free-icons-SearchIcon"',
+    );
+    expect(result.code).toContain(
+      'iconId="ri-hugeicons-core-free-icons-HomeIcon"',
+    );
+    expect(used).toEqual([
+      { pack: '@hugeicons/core-free-icons', exportName: 'SearchIcon' },
+      { pack: '@hugeicons/core-free-icons', exportName: 'HomeIcon' },
     ]);
   });
 
