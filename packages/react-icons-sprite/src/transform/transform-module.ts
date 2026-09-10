@@ -51,6 +51,7 @@ type ScannedImportSpecifier = {
 type ScannedImport = {
   pack: string;
   declarationRange: NodeRange;
+  specifierRange: NodeRange;
   specifiers: ScannedImportSpecifier[];
   specifierCount: number;
 };
@@ -120,12 +121,44 @@ const parseNamedSpecifiers = (
   }
 };
 
+const parseImportSpecifiers = (
+  specifier: string,
+  specifierOffset: number,
+): ScannedImportSpecifier[] => {
+  const specifiers: ScannedImportSpecifier[] = [];
+  const braceStart = specifier.indexOf('{');
+  const defaultPart =
+    braceStart === -1 ? specifier : specifier.slice(0, braceStart);
+  const defaultText = defaultPart.replace(/,\s*$/, '');
+  const defaultRange = trimRange(defaultText, specifierOffset);
+  if (
+    defaultRange &&
+    !specifier
+      .slice(
+        defaultRange[0] - specifierOffset,
+        defaultRange[1] - specifierOffset,
+      )
+      .startsWith('type ')
+  ) {
+    const local = specifier.slice(
+      defaultRange[0] - specifierOffset,
+      defaultRange[1] - specifierOffset,
+    );
+    if (local && /^[A-Za-z_$][\w$]*$/.test(local)) {
+      specifiers.push({ local, exportName: 'default', range: defaultRange });
+    }
+  }
+
+  parseNamedSpecifiers(specifier, specifierOffset, specifiers);
+  return specifiers;
+};
+
 const countImportSpecifiers = (specifier: string): number => {
   let count = 0;
   const braceStart = specifier.indexOf('{');
   const defaultPart =
     braceStart === -1 ? specifier : specifier.slice(0, braceStart);
-  const defaultText = defaultPart.replace(/,$/, '').trim();
+  const defaultText = defaultPart.replace(/,\s*$/, '').trim();
   if (defaultText) {
     count += 1;
   }
@@ -163,35 +196,12 @@ const scanImportsDetailed = (
 
     const matchStart = match.index;
     const specifierOffset = matchStart + statement.indexOf(specifier);
-    const specifiers: ScannedImportSpecifier[] = [];
-    const braceStart = specifier.indexOf('{');
-    const defaultPart =
-      braceStart === -1 ? specifier : specifier.slice(0, braceStart);
-    const defaultText = defaultPart.replace(/,$/, '');
-    const defaultRange = trimRange(defaultText, specifierOffset);
-    if (
-      defaultRange &&
-      !specifier
-        .slice(
-          defaultRange[0] - specifierOffset,
-          defaultRange[1] - specifierOffset,
-        )
-        .startsWith('type ')
-    ) {
-      const local = specifier.slice(
-        defaultRange[0] - specifierOffset,
-        defaultRange[1] - specifierOffset,
-      );
-      if (local && /^[A-Za-z_$][\w$]*$/.test(local)) {
-        specifiers.push({ local, exportName: 'default', range: defaultRange });
-      }
-    }
-
-    parseNamedSpecifiers(specifier, specifierOffset, specifiers);
+    const specifiers = parseImportSpecifiers(specifier, specifierOffset);
     if (specifiers.length) {
       imports.push({
         pack,
         declarationRange: [matchStart, matchStart + statement.length],
+        specifierRange: [specifierOffset, specifierOffset + specifier.length],
         specifiers,
         specifierCount: countImportSpecifiers(specifier),
       });
@@ -845,13 +855,97 @@ const cleanupScannedImports = (
       continue;
     }
 
-    for (const specifier of usedSpecifiers) {
-      const [from, to] = specifierRemovalRange(code, specifier.range);
-      edits.push({ type: 'remove', from, to });
+    const edit = removeImportSpecifiers(code, item, usedLocals);
+    if (edit) {
+      edits.push(edit);
     }
   }
 
   return edits;
+};
+
+const removeImportSpecifiers = (
+  code: string,
+  item: ScannedImport,
+  usedLocals: Set<string>,
+): EditOperation | null => {
+  const specifierText = code.slice(
+    item.specifierRange[0],
+    item.specifierRange[1],
+  );
+  const braceStart = specifierText.indexOf('{');
+  const braceEnd = specifierText.lastIndexOf('}');
+  const defaultSpecifier = item.specifiers.find(
+    (specifier) => specifier.exportName === 'default',
+  );
+  const defaultPart =
+    braceStart === -1 ? specifierText : specifierText.slice(0, braceStart);
+  const defaultLocal = defaultPart.replace(/,\s*$/, '').trim();
+  const parts: string[] = [];
+
+  if (
+    defaultLocal &&
+    (!defaultSpecifier || !usedLocals.has(defaultSpecifier.local))
+  ) {
+    parts.push(defaultLocal);
+  }
+
+  if (braceStart !== -1 && braceEnd > braceStart) {
+    const namedSpecifiers = collectKeptNamedSpecifiers(
+      specifierText.slice(braceStart + 1, braceEnd),
+      usedLocals,
+    );
+    if (namedSpecifiers.length) {
+      parts.push(`{ ${namedSpecifiers.join(', ')} }`);
+    }
+  }
+
+  if (!parts.length) {
+    return {
+      type: 'remove',
+      from: item.declarationRange[0],
+      to: extendToLineEnd(code, item.declarationRange[1]),
+    };
+  }
+
+  return {
+    type: 'replace',
+    from: item.specifierRange[0],
+    to: item.specifierRange[1],
+    value: parts.join(', '),
+  };
+};
+
+const collectKeptNamedSpecifiers = (
+  namedText: string,
+  usedLocals: Set<string>,
+): string[] => {
+  const kept: string[] = [];
+  let segmentStart = 0;
+
+  for (let index = 0; index <= namedText.length; index += 1) {
+    if (index !== namedText.length && namedText[index] !== ',') {
+      continue;
+    }
+
+    const text = namedText.slice(segmentStart, index).trim();
+    segmentStart = index + 1;
+    if (!text) {
+      continue;
+    }
+    if (text.startsWith('type ')) {
+      kept.push(text);
+      continue;
+    }
+
+    const aliasMatch = /^(.*?)\s+as\s+([A-Za-z_$][\w$]*)$/.exec(text);
+    const local = aliasMatch ? aliasMatch[2] : text;
+    if (!usedLocals.has(local)) {
+      kept.push(text);
+    }
+  }
+
+  return kept;
 };
 
 const cleanupScannedFontAwesomeComponentImports = (
@@ -867,12 +961,8 @@ const cleanupScannedFontAwesomeComponentImports = (
       continue;
     }
 
-    const specifiers: ScannedImportSpecifier[] = [];
-    parseNamedSpecifiers(
-      specifier,
-      match.index + statement.indexOf(specifier),
-      specifiers,
-    );
+    const specifierOffset = match.index + statement.indexOf(specifier);
+    const specifiers = parseImportSpecifiers(specifier, specifierOffset);
     const removableSpecifiers = specifiers.filter(
       (item) =>
         item.exportName === 'FontAwesomeIcon' && usedLocals.has(item.local),
@@ -881,18 +971,19 @@ const cleanupScannedFontAwesomeComponentImports = (
       continue;
     }
 
-    if (removableSpecifiers.length === specifiers.length) {
-      edits.push({
-        type: 'remove',
-        from: match.index,
-        to: extendToLineEnd(code, match.index + statement.length),
-      });
-      continue;
-    }
-
-    for (const specifier of removableSpecifiers) {
-      const [from, to] = specifierRemovalRange(code, specifier.range);
-      edits.push({ type: 'remove', from, to });
+    const edit = removeImportSpecifiers(
+      code,
+      {
+        pack: source,
+        declarationRange: [match.index, match.index + statement.length],
+        specifierRange: [specifierOffset, specifierOffset + specifier.length],
+        specifiers,
+        specifierCount: countImportSpecifiers(specifier),
+      },
+      new Set(removableSpecifiers.map((item) => item.local)),
+    );
+    if (edit) {
+      edits.push(edit);
     }
   }
 
@@ -912,12 +1003,8 @@ const cleanupScannedHugeiconsComponentImports = (
       continue;
     }
 
-    const specifiers: ScannedImportSpecifier[] = [];
-    parseNamedSpecifiers(
-      specifier,
-      match.index + statement.indexOf(specifier),
-      specifiers,
-    );
+    const specifierOffset = match.index + statement.indexOf(specifier);
+    const specifiers = parseImportSpecifiers(specifier, specifierOffset);
     const removableSpecifiers = specifiers.filter(
       (item) =>
         item.exportName === 'HugeiconsIcon' && usedLocals.has(item.local),
@@ -926,18 +1013,19 @@ const cleanupScannedHugeiconsComponentImports = (
       continue;
     }
 
-    if (removableSpecifiers.length === specifiers.length) {
-      edits.push({
-        type: 'remove',
-        from: match.index,
-        to: extendToLineEnd(code, match.index + statement.length),
-      });
-      continue;
-    }
-
-    for (const specifier of removableSpecifiers) {
-      const [from, to] = specifierRemovalRange(code, specifier.range);
-      edits.push({ type: 'remove', from, to });
+    const edit = removeImportSpecifiers(
+      code,
+      {
+        pack: source,
+        declarationRange: [match.index, match.index + statement.length],
+        specifierRange: [specifierOffset, specifierOffset + specifier.length],
+        specifiers,
+        specifierCount: countImportSpecifiers(specifier),
+      },
+      new Set(removableSpecifiers.map((item) => item.local)),
+    );
+    if (edit) {
+      edits.push(edit);
     }
   }
 
@@ -962,33 +1050,6 @@ const extendToLineEnd = (code: string, end: number): number => {
   return to;
 };
 
-const specifierRemovalRange = (
-  code: string,
-  [start, end]: NodeRange,
-): NodeRange => {
-  let from = start;
-  let to = end;
-
-  let before = start - 1;
-  while (before >= 0 && isWhitespaceCode(code.charCodeAt(before))) {
-    before -= 1;
-  }
-  if (before >= 0 && code[before] === ',') {
-    from = before;
-    return [from, to];
-  }
-
-  let after = end;
-  while (after < code.length && isWhitespaceCode(code.charCodeAt(after))) {
-    after += 1;
-  }
-  if (after < code.length && code[after] === ',') {
-    to = consumeTrailingWhitespace(code, after + 1);
-  }
-
-  return [from, to];
-};
-
 const consumeTrailingWhitespace = (code: string, start: number): number => {
   let to = start;
   while (to < code.length && isWhitespaceCode(code.charCodeAt(to))) {
@@ -1008,6 +1069,60 @@ const rangeContains = ([start, end]: NodeRange, index: number): boolean => {
   return index >= start && index < end;
 };
 
+const findPreviousJsxTextBoundary = (code: string, start: number): number => {
+  let index = start - 1;
+  while (index >= 0) {
+    const char = code[index];
+    if (char === '>' || char === '<' || char === '{' || char === '}') {
+      return index;
+    }
+    index -= 1;
+  }
+  return -1;
+};
+
+const findNextJsxTextBoundary = (code: string, start: number): number => {
+  let index = start;
+  while (index < code.length) {
+    const char = code[index];
+    if (char === '<' || char === '{') {
+      return index;
+    }
+    index += 1;
+  }
+  return -1;
+};
+
+const isLikelyJsxTagStart = (code: string, index: number): boolean => {
+  const next = code[index + 1];
+  return next === '/' || next === '>' || isIdentifierStart(next);
+};
+
+const isLikelyJsxTextIdentifier = (
+  code: string,
+  start: number,
+  end: number,
+): boolean => {
+  const previousBoundary = findPreviousJsxTextBoundary(code, start);
+  if (
+    previousBoundary === -1 ||
+    (code[previousBoundary] !== '>' && code[previousBoundary] !== '}')
+  ) {
+    return false;
+  }
+
+  const nextBoundary = findNextJsxTextBoundary(code, end);
+  if (nextBoundary === -1) {
+    return false;
+  }
+  if (code[nextBoundary] === '<' && !isLikelyJsxTagStart(code, nextBoundary)) {
+    return false;
+  }
+
+  const text = code.slice(previousBoundary + 1, nextBoundary);
+  return !/[=()[\]{};,+*/%|?]/.test(text);
+};
+
 const collectUsedLocalsOutsideRanges = (
   code: string,
   usedLocals: Set<string>,
@@ -1017,6 +1132,8 @@ const collectUsedLocalsOutsideRanges = (
   const found = new Set<string>();
   let rangeIndex = 0;
   let quote: '"' | "'" | null = null;
+  let template = false;
+  let templateExpressionDepth = 0;
   let lineComment = false;
   let blockComment = false;
 
@@ -1059,6 +1176,22 @@ const collectUsedLocalsOutsideRanges = (
       continue;
     }
 
+    if (template && templateExpressionDepth === 0) {
+      if (char === '\\') {
+        index += 1;
+        continue;
+      }
+      if (char === '`') {
+        template = false;
+        continue;
+      }
+      if (char === '$' && next === '{') {
+        templateExpressionDepth = 1;
+        index += 1;
+      }
+      continue;
+    }
+
     if (char === '/' && next === '/') {
       lineComment = true;
       index += 1;
@@ -1071,8 +1204,25 @@ const collectUsedLocalsOutsideRanges = (
       continue;
     }
 
+    if (template && templateExpressionDepth > 0) {
+      if (char === '{') {
+        templateExpressionDepth += 1;
+      }
+      if (char === '}') {
+        templateExpressionDepth -= 1;
+        if (templateExpressionDepth === 0) {
+          continue;
+        }
+      }
+    }
+
     if (char === '"' || char === "'") {
       quote = char;
+      continue;
+    }
+
+    if (char === '`') {
+      template = true;
       continue;
     }
 
@@ -1087,7 +1237,10 @@ const collectUsedLocalsOutsideRanges = (
     }
 
     const local = code.slice(start, index);
-    if (usedLocals.has(local)) {
+    if (
+      usedLocals.has(local) &&
+      !isLikelyJsxTextIdentifier(code, start, index)
+    ) {
       found.add(local);
     }
     index -= 1;
