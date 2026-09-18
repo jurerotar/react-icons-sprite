@@ -20,6 +20,7 @@ export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
   /^@fluentui\/react-icons(?:\/svg\/[\w-]+)?$/,
   /^@primer\/octicons-react$/,
   /^@hugeicons\/core-free-icons(?:\/.*)?$/,
+  /^@pillage-first\/graphics$/,
 ];
 
 type ImportResolver = (pack: string, exportName: string) => string;
@@ -52,7 +53,7 @@ const exactResolvers: Record<string, ImportResolver> = {
   '@carbon/icons-react': (pack, name) => `${pack}/es/${name}.js`,
   '@ant-design/icons': (pack, name) => `${pack}/lib/icons/${name}.js`,
   '@fluentui/react-icons': (pack, name) =>
-    `${pack}/lib-cjs/atoms/svg/${fluentIconPathName(name)}.js`,
+    `${pack}/lib/atoms/svg/${fluentIconPathName(name)}`,
   '@primer/octicons-react': (pack) => pack,
   '@hugeicons/core-free-icons': (pack, name) => `${pack}/${name}`,
 };
@@ -75,7 +76,7 @@ export const resolveIconImport = (pack: string, exportName: string): string => {
 
   const fluentSubpath = /^@fluentui\/react-icons\/svg\/(.+)$/.exec(pack);
   if (fluentSubpath) {
-    return `@fluentui/react-icons/lib-cjs/atoms/svg/${fluentSubpath[1]}.js`;
+    return `@fluentui/react-icons/lib/atoms/svg/${fluentSubpath[1]}`;
   }
 
   if (/^@hugeicons\/core-free-icons\/.+$/.test(pack)) {

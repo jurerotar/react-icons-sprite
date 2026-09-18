@@ -65,7 +65,7 @@ describe('resolveIconImport', () => {
     );
     expect(
       resolveIconImport('@fluentui/react-icons', 'CalendarAdd24Regular'),
-    ).toBe('@fluentui/react-icons/lib-cjs/atoms/svg/calendar-add.js');
+    ).toBe('@fluentui/react-icons/lib/atoms/svg/calendar-add');
     expect(resolveIconImport('@primer/octicons-react', 'AlertIcon')).toBe(
       '@primer/octicons-react',
     );
@@ -80,7 +80,7 @@ describe('resolveIconImport', () => {
     ).toBe('@ant-design/icons/lib/icons/AlertOutlined.js');
     expect(
       resolveIconImport('@fluentui/react-icons/svg/add', 'Add24Regular'),
-    ).toBe('@fluentui/react-icons/lib-cjs/atoms/svg/add.js');
+    ).toBe('@fluentui/react-icons/lib/atoms/svg/add');
     expect(
       resolveIconImport(
         '@hugeicons/core-free-icons/GlobalSearchIcon',
