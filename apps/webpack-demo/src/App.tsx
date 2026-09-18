@@ -21,6 +21,7 @@ import { Add24Regular as FluentAdd24Regular } from '@fluentui/react-icons';
 import { AlertIcon as OcticonAlert } from '@primer/octicons-react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { GlobalSearchIcon } from '@hugeicons/core-free-icons';
+import { PillageFirstWood } from '@pillage-first/graphics';
 
 const App = () => {
   return (
@@ -156,6 +157,14 @@ const App = () => {
           <h2 className="icon-title">@hugeicons/react</h2>
           <HugeiconsIcon
             icon={GlobalSearchIcon}
+            width={32}
+            height={32}
+          />
+        </section>
+
+        <section className="icon-card">
+          <h2 className="icon-title">@pillage-first/graphics</h2>
+          <PillageFirstWood
             width={32}
             height={32}
           />

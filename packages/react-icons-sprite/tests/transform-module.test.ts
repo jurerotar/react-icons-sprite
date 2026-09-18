@@ -640,4 +640,25 @@ describe('transformModule', () => {
     expect(result.code).not.toContain('from "@/icons"');
     expect(used).toEqual([{ pack: '@/icons', exportName: 'CustomSearch' }]);
   });
+
+  test('rewrites Pillage First graphics icons by default', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { PillageFirstWood } from "@pillage-first/graphics";\nexport const A = () => <PillageFirstWood />;`;
+
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code).toContain(
+      'iconId="ri-pillage-first-graphics-PillageFirstWood"',
+    );
+    expect(result.code).not.toContain('from "@pillage-first/graphics"');
+    expect(used).toEqual([
+      {
+        pack: '@pillage-first/graphics',
+        exportName: 'PillageFirstWood',
+      },
+    ]);
+  });
 });

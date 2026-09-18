@@ -34,6 +34,7 @@
     "@mui/icons-material": "9.3.1",
     "@mui/material": "9.3.1",
     "@phosphor-icons/react": "2.1.10",
+    "@pillage-first/graphics": "^0.4.0-rc1",
     "@primer/octicons-react": "19.33.0",
     "@radix-ui/react-icons": "1.3.2",
     "@remixicon/react": "4.9.0",
