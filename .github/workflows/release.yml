@@ -1,7 +1,7 @@
 name: release
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 on:
@@ -31,26 +31,90 @@ jobs:
       - name: Build package
         run: npm run build --workspace react-icons-sprite
 
-      - name: Resolve npm dist tag
-        id: npm-tag
+      - name: Resolve release metadata
+        id: release
         run: |
           version="$(node -p "require('./packages/react-icons-sprite/package.json').version")"
           prerelease="${version#*-}"
           if [ "$prerelease" = "$version" ]; then
             tag="latest"
+            is_prerelease="false"
           elif [[ "$prerelease" =~ ^rc[0-9]*([.-].*)?$ ]]; then
             tag="rc"
+            is_prerelease="true"
           else
             tag="${prerelease%%[.-]*}"
+            is_prerelease="true"
           fi
           if [[ ! "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
             echo "Invalid npm dist-tag: $tag" >&2
             exit 1
           fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "npm-tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release-tag=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$is_prerelease" >> "$GITHUB_OUTPUT"
           echo "Publishing react-icons-sprite@$version with npm dist-tag '$tag'"
+          echo "GitHub release tag: $version"
 
       - name: Publish package with provenance
         env:
-          NPM_DIST_TAG: ${{ steps.npm-tag.outputs.tag }}
+          NPM_DIST_TAG: ${{ steps.release.outputs.npm-tag }}
         run: npm publish --workspace react-icons-sprite --access public --tag "$NPM_DIST_TAG"
+
+      - name: Create git tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.release-tag }}
+        run: |
+          existing_sha="$(
+            gh api \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
+              --jq '.object.sha' 2>/dev/null || true
+          )"
+
+          if [ -n "$existing_sha" ]; then
+            if [ "$existing_sha" != "$GITHUB_SHA" ]; then
+              echo "Tag '$RELEASE_TAG' already exists at $existing_sha, expected $GITHUB_SHA" >&2
+              exit 1
+            fi
+
+            echo "Tag '$RELEASE_TAG' already exists at $GITHUB_SHA"
+            exit 0
+          fi
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/tags/${RELEASE_TAG}" \
+            -f "sha=${GITHUB_SHA}" \
+            >/dev/null
+
+          echo "Created tag '$RELEASE_TAG' at $GITHUB_SHA"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.release-tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_PRERELEASE: ${{ steps.release.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "GitHub release '$RELEASE_TAG' already exists"
+            exit 0
+          fi
+
+          release_args=(
+            "$RELEASE_TAG"
+            --verify-tag
+            --title "react-icons-sprite@${RELEASE_VERSION}"
+            --generate-notes
+          )
+
+          if [ "$RELEASE_PRERELEASE" = "true" ]; then
+            release_args+=(--prerelease)
+          fi
+
+          gh release create "${release_args[@]}"

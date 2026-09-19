@@ -30,7 +30,7 @@ describe('isRenderableComponent', () => {
 describe('extractSymbolAttributes', () => {
   test('keeps fill and stroke-related svg attributes needed by outline icons', () => {
     const markup =
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" width="24" height="24"><path d="M0 0h24v24H0z"/></svg>';
+      '<svg xmlns="http://www.w3.org/2000/svg" id="source-root" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" width="24" height="24"><path d="M0 0h24v24H0z"/></svg>';
 
     expect(extractSymbolAttributes(markup)).toBe(
       'fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"',
@@ -110,5 +110,39 @@ describe('renderIcon', () => {
     expect(rendered.viewBox).toBe('0 0 16 16');
     expect(rendered.symbolAttributes).toContain('fill="none"');
     expect(rendered.symbolBody).toContain('<path');
+  });
+
+  test('renders all Pillage First graphics icon components without root svg ids', async () => {
+    const pillageFirstIcons = [
+      'PillageFirstCatapult',
+      'PillageFirstCavalryDefence',
+      'PillageFirstClay',
+      'PillageFirstDefence',
+      'PillageFirstHorse',
+      'PillageFirstInfantryDefence',
+      'PillageFirstIron',
+      'PillageFirstScroll',
+      'PillageFirstWheat',
+      'PillageFirstWheatOff',
+      'PillageFirstWood',
+    ];
+
+    await Promise.all(
+      pillageFirstIcons.map(async (exportName) => {
+        const rendered = await renderIcon(
+          '@pillage-first/graphics',
+          exportName,
+          {
+            baseDir: process.cwd(),
+          },
+        );
+
+        expect(rendered.viewBox).not.toBe('');
+        expect(rendered.symbolAttributes).not.toContain('id=');
+        expect(rendered.symbolBody).toMatch(
+          /<(path|g|circle|rect|polygon|polyline|line|ellipse)\b/,
+        );
+      }),
+    );
   });
 });

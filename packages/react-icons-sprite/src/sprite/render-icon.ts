@@ -16,7 +16,13 @@ const VIEWBOX_RE = /viewBox=["']([^"']+)["']/i;
 const SVG_OPEN_RE = /<svg\b([^>]*)>/i;
 const SVG_ATTR_RE = /([:\w-]+)=("[^"]*"|'[^']*')/g;
 
-const OMITTED_SVG_ATTRIBUTES = new Set(['xmlns', 'viewBox', 'width', 'height']);
+const OMITTED_SVG_ATTRIBUTES = new Set([
+  'xmlns',
+  'viewBox',
+  'width',
+  'height',
+  'id',
+]);
 
 type PackageJson = {
   exports?: unknown;
