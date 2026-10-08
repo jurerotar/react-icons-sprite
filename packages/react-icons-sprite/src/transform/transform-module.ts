@@ -40,6 +40,7 @@ type TransformResult = {
 
 type TransformModuleOptions = {
   sourceMap?: boolean;
+  excludedSources?: readonly RegExp[];
 };
 
 type ScannedImportSpecifier = {
@@ -179,13 +180,17 @@ const countImportSpecifiers = (specifier: string): number => {
 const scanImportsDetailed = (
   code: string,
   sources: readonly RegExp[],
+  excludedSources: readonly RegExp[],
 ): ScannedImport[] => {
   const imports: ScannedImport[] = [];
   IMPORT_RE.lastIndex = 0;
 
   for (const match of code.matchAll(IMPORT_RE)) {
     const [statement, specifier, , pack] = match;
-    if (!sources.some((source) => sourceMatches(source, pack))) {
+    if (
+      !sources.some((source) => sourceMatches(source, pack)) ||
+      excludedSources.some((source) => sourceMatches(source, pack))
+    ) {
       continue;
     }
 
@@ -1285,13 +1290,13 @@ export const transformModule = (
   sources: readonly RegExp[] = DEFAULT_ICON_SOURCES,
   options: TransformModuleOptions = {},
 ): TransformResult => {
-  const { sourceMap = false } = options;
+  const { sourceMap = false, excludedSources = [] } = options;
 
   if (!fastFilter(code)) {
     return { code, map: null, anyReplacements: false };
   }
 
-  const scannedImports = scanImportsDetailed(code, sources);
+  const scannedImports = scanImportsDetailed(code, sources, excludedSources);
   if (!scannedImports.length) {
     return { code, map: null, anyReplacements: false };
   }

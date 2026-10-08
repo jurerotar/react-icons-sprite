@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  createExcludedIconSources,
   createIconSources,
   createSpriteAssetName,
 } from '../src/plugin-options';
@@ -9,6 +10,14 @@ describe('plugin options', () => {
     const sources = createIconSources();
 
     expect(sources.some((source) => source.test('lucide-react'))).toBe(true);
+  });
+
+  test('normalizes one or many excluded icon sources', () => {
+    const source = /^@pillage-first\/graphics$/;
+
+    expect(createExcludedIconSources(source)).toEqual([source]);
+    expect(createExcludedIconSources([source])).toEqual([source]);
+    expect(createExcludedIconSources()).toEqual([]);
   });
 
   test('joins output directory and sprite file name as an asset path', () => {

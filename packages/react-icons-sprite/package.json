@@ -79,7 +79,7 @@
     "@tabler/icons-react": ">=3",
     "devicons-react": ">=1",
     "grommet-icons": ">=4",
-    "lucide-react": ">=1",
+    "lucide-react": ">=0.0.0-0",
     "phosphor-react": ">=1",
     "react-bootstrap-icons": ">=1",
     "react-feather": ">=2",
@@ -88,11 +88,13 @@
     "react-dom": ">= 16"
   },
   "dependencies": {
-    "magic-string": "1.2.2"
+    "magic-string": "1.2.2",
+    "semver": "7.8.5"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
     "@types/react-dom": "19.2.4",
+    "@types/semver": "7.8.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "tsdown": "0.22.14",

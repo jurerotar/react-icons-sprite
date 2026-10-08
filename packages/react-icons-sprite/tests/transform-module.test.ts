@@ -641,6 +641,25 @@ describe('transformModule', () => {
     expect(used).toEqual([{ pack: '@/icons', exportName: 'CustomSearch' }]);
   });
 
+  test('leaves excluded icon sources inline so their child SVG elements remain styleable', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { PillageFirstHorse } from "@pillage-first/graphics";\nexport const A = () => <PillageFirstHorse className="horse" />;`;
+
+    const result = transformModule(
+      input,
+      'file.tsx',
+      (pack, exportName) => {
+        used.push({ pack, exportName });
+      },
+      undefined,
+      { excludedSources: [/^@pillage-first\/graphics$/] },
+    );
+
+    expect(result.anyReplacements).toBe(false);
+    expect(result.code).toBe(input);
+    expect(used).toEqual([]);
+  });
+
   test('rewrites Pillage First graphics icons by default', () => {
     const used: Array<{ pack: string; exportName: string }> = [];
     const input = `import { PillageFirstWood } from "@pillage-first/graphics";\nexport const A = () => <PillageFirstWood />;`;

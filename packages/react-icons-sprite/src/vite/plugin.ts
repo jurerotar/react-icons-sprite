@@ -2,6 +2,7 @@ import type { Plugin } from 'vite';
 import { createHash } from 'node:crypto';
 import { createCollector } from '../collector/create-collector';
 import {
+  createExcludedIconSources,
   createIconSources,
   createSpriteAssetName,
   type ReactIconsSpritePluginOptions,
@@ -17,6 +18,7 @@ export const reactIconsSprite = (
 ): Plugin => {
   const { outputDir } = options;
   const iconSources = createIconSources();
+  const excludedIconSources = createExcludedIconSources(options.exclude);
 
   const collector = createCollector();
   let root = process.cwd();
@@ -54,6 +56,7 @@ export const reactIconsSprite = (
             });
           },
           iconSources,
+          { excludedSources: excludedIconSources },
         );
         if (!anyReplacements) {
           return null;

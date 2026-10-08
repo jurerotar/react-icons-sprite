@@ -15,7 +15,7 @@ used by the demo apps and validation suite:
 | Library | Validated version |
 |---|---:|
 | `react-icons/*` packs (e.g. `react-icons/bi`, `react-icons/fa`, ...) | `5.6.0` |
-| `lucide-react` | `1.16.0` |
+| `lucide-react` | `1.16.0`, `1.43.0` |
 | `@radix-ui/react-icons` | `1.3.2` |
 | `@heroicons/react` (v1 and v2 subpaths) | `2.2.0` |
 | `@tabler/icons-react` | `3.44.0` |
@@ -38,6 +38,10 @@ used by the demo apps and validation suite:
 > [!NOTE]
 > `react-icons-sprite` does not bundle these libraries. You must install whichever icon packages you intend to use in
 > your project.
+
+Icon resolvers select the first matching version range using the icon package installed in the importing project.
+This also applies to subpath imports such as `@fluentui/react-icons/svg/add` and `@mui/icons-material/Alarm`.
+Additional layout changes can be supported by adding a `{ range, resolve }` entry in `src/packs/icon-resolvers.ts`.
 
 ## Motivation
 
@@ -202,6 +206,7 @@ module.exports = {
         use: [
           {
             loader: require.resolve('react-icons-sprite/webpack/loader'),
+            // optional: options: { exclude: /^@pillage-first\/graphics$/ },
           },
           // put your ts/tsx loader after ours (e.g. swc-loader or ts-loader)
         ],
@@ -221,6 +226,9 @@ module.exports = {
 All options are optional:
 
 - `outputDir`: directory inside the bundler output where the sprite asset is emitted.
+- `exclude`: a `RegExp` or list of regular expressions for icon import sources
+  that must remain inline. Use this for icons whose CSS targets child SVG
+  elements; those selectors cannot cross a sprite `<use>` reference.
 
 ### Rsbuild
 

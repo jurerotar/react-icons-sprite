@@ -3,7 +3,10 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createElement, type ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { resolveIconImport } from '../packs/icon-resolvers';
+import {
+  hasVersionedIconResolver,
+  resolveIconImport,
+} from '../packs/icon-resolvers';
 
 export type RenderedIcon = {
   symbolBody: string;
@@ -25,6 +28,7 @@ const OMITTED_SVG_ATTRIBUTES = new Set([
 ]);
 
 type PackageJson = {
+  version?: string;
   exports?: unknown;
   module?: string;
   main?: string;
@@ -162,24 +166,14 @@ const resolveFileCandidate = (filePath: string): string | null => {
   return candidates.find(fileExists) ?? null;
 };
 
-const resolveFromBaseDir = (
-  specifier: string,
-  baseDir: string,
+const resolveFromPackageRoot = (
+  packageRoot: string,
+  subpath: string,
 ): string | null => {
-  const parsed = parsePackageSpecifier(specifier);
-  if (!parsed) {
-    return null;
-  }
-
-  const packageRoot = findPackageRoot(parsed.packageName, baseDir);
-  if (!packageRoot) {
-    return null;
-  }
-
   const packageJson = JSON.parse(
     readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
   ) as PackageJson;
-  const exportTarget = resolveExportTarget(packageJson.exports, parsed.subpath);
+  const exportTarget = resolveExportTarget(packageJson.exports, subpath);
 
   if (exportTarget) {
     const resolved = resolveFileCandidate(path.join(packageRoot, exportTarget));
@@ -188,14 +182,28 @@ const resolveFromBaseDir = (
     }
   }
 
-  if (parsed.subpath === '.') {
+  if (subpath === '.') {
     const entry = packageJson.module ?? packageJson.main;
     if (entry) {
       return resolveFileCandidate(path.join(packageRoot, entry));
     }
   }
 
-  return resolveFileCandidate(path.join(packageRoot, parsed.subpath));
+  return resolveFileCandidate(path.join(packageRoot, subpath));
+};
+
+const resolveFromBaseDir = (
+  specifier: string,
+  baseDir: string,
+): string | null => {
+  const parsed = parsePackageSpecifier(specifier);
+  if (!parsed) {
+    return null;
+  }
+  const packageRoot = findPackageRoot(parsed.packageName, baseDir);
+  return packageRoot
+    ? resolveFromPackageRoot(packageRoot, parsed.subpath)
+    : null;
 };
 
 const resolveImportSpecifier = (
@@ -250,7 +258,12 @@ const pickExport = (
   if (exportName === 'default') {
     return moduleExports.default;
   }
-  return moduleExports[exportName] ?? moduleExports.default;
+  const defaultExport = moduleExports.default;
+  const nestedExport =
+    defaultExport && typeof defaultExport === 'object'
+      ? (defaultExport as Record<string, unknown>)[exportName]
+      : undefined;
+  return moduleExports[exportName] ?? nestedExport ?? defaultExport;
 };
 
 const unwrapNestedDefaultExport = (value: unknown): unknown => {
@@ -390,12 +403,60 @@ export const renderIcon = async (
   exportName: string,
   options: RenderIconOptions = {},
 ): Promise<RenderedIcon> => {
-  const importPath = options.importPath ?? resolveIconImport(pack, exportName);
+  let packageRoot: string | null = null;
+  let version: string | undefined;
+  const packageName = parsePackageSpecifier(pack)?.packageName ?? pack;
+  if (!options.importPath && hasVersionedIconResolver(pack)) {
+    const baseDir = options.baseDir ?? process.cwd();
+    const importerDir = options.importer
+      ? path.dirname(options.importer.split('?', 1)[0])
+      : baseDir;
+    packageRoot =
+      findPackageRoot(packageName, importerDir) ??
+      findPackageRoot(packageName, baseDir);
+    if (packageRoot) {
+      const packageJson = JSON.parse(
+        readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
+      ) as PackageJson;
+      version = packageJson.version;
+    }
+  }
+
+  const importPath =
+    options.importPath ?? resolveIconImport(pack, exportName, version);
+  let specifier = importPath;
+  if (packageRoot) {
+    const subpath = parsePackageSpecifier(importPath)?.subpath ?? '.';
+    specifier =
+      resolveFromPackageRoot(packageRoot, subpath) ??
+      path.join(packageRoot, subpath === '.' ? 'index.js' : subpath);
+  }
+  if (
+    pack === 'lucide-react' &&
+    packageRoot &&
+    importPath.startsWith(`${pack}/`) &&
+    !fileExists(specifier)
+  ) {
+    // Renamed icons and unusual spellings are still exported by the entry module.
+    specifier = path.join(
+      packageRoot,
+      `dist/esm/lucide-react${path.extname(specifier)}`,
+    );
+  }
   const imported = (await import(
-    resolveImportSpecifier(importPath, options)
+    resolveImportSpecifier(specifier, options)
   )) as Record<string, unknown>;
   const iconComponent = unwrapNestedDefaultExport(
-    pickExport(imported, exportName),
+    pickExport(
+      imported,
+      exportName === 'default' &&
+        imported.default === undefined &&
+        packageRoot &&
+        importPath !== pack &&
+        pack !== packageName
+        ? (pack.split('/').at(-1) ?? exportName)
+        : exportName,
+    ),
   );
 
   if (isFontAwesomeIconDefinition(iconComponent)) {
