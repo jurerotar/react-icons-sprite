@@ -88,20 +88,26 @@
     "react-dom": ">= 16"
   },
   "dependencies": {
-    "magic-string": "1.2.2",
+    "magic-string": "1.4.3",
     "semver": "7.8.5"
   },
   "devDependencies": {
-    "@types/node": "26.2.0",
-    "@types/react-dom": "19.2.4",
+    "@ant-design/icons": "6.3.4",
+    "@biomejs/biome": "2.5.15",
+    "@hugeicons/core-free-icons": "4.3.5",
+    "@pillage-first/graphics": "0.4.0-rc8",
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "@types/semver": "7.8.0",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "tsdown": "0.22.14",
+    "lucide-react": "1.53.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tsdown": "0.23.0",
     "typescript": "7.0.2",
-    "vite": "8.2.2",
+    "vite": "8.3.4",
     "vitest": "4.1.11",
-    "webpack": "5.109.2"
+    "webpack": "5.111.1"
   },
   "keywords": [
     "vite",
