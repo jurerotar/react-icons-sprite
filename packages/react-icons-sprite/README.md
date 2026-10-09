@@ -9,31 +9,28 @@ reconcile large, nested SVG trees.
 
 ## Supported icon libraries
 
-Out of the box, imports from the following libraries are detected and transformed. These are the versions currently
-used by the demo apps and validation suite:
+Out of the box, imports from the following icon sets are detected and transformed:
 
-| Library | Validated version |
-|---|---:|
-| `react-icons/*` packs (e.g. `react-icons/bi`, `react-icons/fa`, ...) | `5.6.0` |
-| `lucide-react` | `1.16.0`, `1.43.0` |
-| `@radix-ui/react-icons` | `1.3.2` |
-| `@heroicons/react` (v1 and v2 subpaths) | `2.2.0` |
-| `@tabler/icons-react` | `3.44.0` |
-| `phosphor-react` | `1.4.1` |
-| `@phosphor-icons/react` | `2.1.10` |
-| `react-feather` | `2.0.10` |
-| `react-bootstrap-icons` | `1.11.6` |
-| `grommet-icons` | `4.14.0` |
-| `@remixicon/react` | `4.9.0` |
-| `devicons-react` | `1.5.0` |
-| `@fortawesome/free-solid-svg-icons` (and other Font Awesome icon packs) | `7.2.0` |
-| `@fortawesome/react-fontawesome` | `3.3.1` |
-| `@mui/icons-material` | `9.0.1` |
-| `@carbon/icons-react` | `11.81.0` |
-| `@ant-design/icons` | `6.2.5` |
-| `@fluentui/react-icons` | `2.0.330` |
-| `@primer/octicons-react` | `19.28.1` |
-| `@hugeicons/react` with `@hugeicons/core-free-icons` | `1.1.6` / `4.2.0` |
+- `react-icons/*` packs (e.g. `react-icons/bi`, `react-icons/fa`, ...)
+- `lucide-react`
+- `@radix-ui/react-icons`
+- `@heroicons/react` (including subpaths)
+- `@tabler/icons-react`
+- `phosphor-react`
+- `@phosphor-icons/react`
+- `react-feather`
+- `react-bootstrap-icons`
+- `grommet-icons`
+- `@remixicon/react`
+- `devicons-react`
+- `@fortawesome/free-solid-svg-icons` and other Font Awesome icon packs, used with `@fortawesome/react-fontawesome`
+- `@mui/icons-material`
+- `@carbon/icons-react`
+- `@ant-design/icons`
+- `@fluentui/react-icons`
+- `@primer/octicons-react`
+- `@hugeicons/core-free-icons`, used with `@hugeicons/react`
+- `@pillage-first/graphics`
 
 > [!NOTE]
 > `react-icons-sprite` does not bundle these libraries. You must install whichever icon packages you intend to use in
