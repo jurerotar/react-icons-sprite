@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { describe, test } from 'vitest';
 import { transformModule } from '../src/transform/transform-module';
 
 const id = 'BenchmarkComponent.tsx';
@@ -87,18 +87,25 @@ const mixedCode = `
 `;
 
 describe('transformModule benchmark', () => {
-  bench('transforms a component with many icon usages', () => {
-    transformModule(code, id, () => {});
+  test('transforms a component with many icon usages', async ({ bench }) => {
+    await bench('transformModule', () => {
+      transformModule(code, id, () => {});
+    }).run();
   });
 
-  bench('transforms a component with many reference prop icon usages', () => {
-    transformModule(referenceCode, id, () => {});
+  test('transforms a component with many reference prop icon usages', async ({
+    bench,
+  }) => {
+    await bench('transformModule', () => {
+      transformModule(referenceCode, id, () => {});
+    }).run();
   });
 
-  bench(
-    'transforms a component with mixed component and reference icon usages',
-    () => {
+  test('transforms a component with mixed component and reference icon usages', async ({
+    bench,
+  }) => {
+    await bench('transformModule', () => {
       transformModule(mixedCode, id, () => {});
-    },
-  );
+    }).run();
+  });
 });
