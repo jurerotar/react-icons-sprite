@@ -133,8 +133,9 @@ This is a big win when you’re rendering icons in lists, tables, or maps where 
 
 ### Performance comparison
 
-The build-time transform is also intentionally small. The current Vitest benchmark transforms a component with 240 icon
-usages at **32,805.97 ops/sec** (mean **0.0305 ms** per transform) on the machine listed below.
+Build-time transforms use syntax parsing and lexical scope analysis to preserve comments, strings, and shadowed
+bindings. From the repository root, run `npm exec --workspace react-icons-sprite -- vitest bench --run` to benchmark
+direct icon usages, component references, and mixed usages.
 
 | icon (pack)             | react-icons icon render mean time | react-icons-sprite icon render mean time | Relative difference |
 |-------------------------|----------------------------------:|-----------------------------------------:|--------------------:|
@@ -220,7 +221,8 @@ module.exports = {
 
 ### Options
 
-All options are optional:
+All options are optional. In Vite, pass them to `reactIconsSprite()`. In Webpack and Rsbuild,
+pass `outputDir` to the plugin and `exclude` to the loader options:
 
 - `outputDir`: directory inside the bundler output where the sprite asset is emitted.
 - `exclude`: a `RegExp` or list of regular expressions for icon import sources

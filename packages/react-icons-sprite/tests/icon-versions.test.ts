@@ -9,8 +9,14 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterAll, expect, test } from 'vitest';
-import { renderIcon } from '../src/sprite/render-icon';
+import { afterAll, expect, test, vi } from 'vitest';
+import { createIconRenderer, renderIcon } from '../src/sprite/render-icon';
+import { buildSprite } from '../src/sprite/build-sprite';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { ...actual, readFileSync: vi.fn(actual.readFileSync) };
+});
 
 const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'icon-versions-'));
 const reactPath = createRequire(import.meta.url).resolve('react');
@@ -202,3 +208,80 @@ test.each(['exact', 'wildcard'])(
     expect(icon.symbolBody).toContain('data-version="4.3.5"');
   },
 );
+
+test('reads each package manifest once per sprite build and refreshes it between builds', async () => {
+  const baseDir = path.join(fixtureRoot, 'build-cache');
+  const pack = '@tabler/icons-react';
+  writePackage(
+    baseDir,
+    pack,
+    '2.1.0',
+    'dist/esm/icons/IconAlertCircle.js',
+    'IconAlertCircle',
+  );
+  const icons = Array.from({ length: 100 }, () => ({
+    pack,
+    exportName: 'IconAlertCircle',
+  }));
+  const manifestPath = path.join(baseDir, 'node_modules', pack, 'package.json');
+  const reads = vi.mocked(readFileSync);
+  reads.mockClear();
+
+  expect(await buildSprite(icons, { baseDir })).toContain(
+    'data-version="2.1.0"',
+  );
+  expect(
+    reads.mock.calls.filter(([file]) => file === manifestPath),
+  ).toHaveLength(1);
+
+  writePackage(
+    baseDir,
+    pack,
+    '3.0.0',
+    'dist/esm/icons/IconAlertCircle.mjs',
+    'IconAlertCircle',
+  );
+  reads.mockClear();
+  expect(await buildSprite(icons, { baseDir })).toContain(
+    'data-version="3.0.0"',
+  );
+  expect(
+    reads.mock.calls.filter(([file]) => file === manifestPath),
+  ).toHaveLength(1);
+});
+
+test('keeps cached versions separate for packages resolved from different importers', async () => {
+  const baseDir = path.join(fixtureRoot, 'cached-importers');
+  const nestedDir = path.join(baseDir, 'nested');
+  const pack = '@tabler/icons-react';
+  writePackage(
+    baseDir,
+    pack,
+    '2.1.0',
+    'dist/esm/icons/IconAlertCircle.js',
+    'IconAlertCircle',
+  );
+  writePackage(
+    nestedDir,
+    pack,
+    '3.0.0',
+    'dist/esm/icons/IconAlertCircle.mjs',
+    'IconAlertCircle',
+  );
+  const render = createIconRenderer();
+  const options = { baseDir };
+  expect((await render(pack, 'IconAlertCircle', options)).symbolBody).toContain(
+    'data-version="2.1.0"',
+  );
+  expect(
+    (
+      await render(pack, 'IconAlertCircle', {
+        ...options,
+        importer: path.join(nestedDir, 'entry.tsx'),
+      })
+    ).symbolBody,
+  ).toContain('data-version="3.0.0"');
+  expect((await render(pack, 'IconAlertCircle', options)).symbolBody).toContain(
+    'data-version="2.1.0"',
+  );
+});

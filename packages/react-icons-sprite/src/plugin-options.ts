@@ -1,4 +1,4 @@
-import { DEFAULT_ICON_SOURCES } from './packs/icon-resolvers';
+import { DEFAULT_ICON_SOURCES } from './packs/icon-sources';
 
 export type IconSourceExclusion = RegExp | readonly RegExp[];
 

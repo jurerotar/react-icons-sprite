@@ -1,30 +1,7 @@
-import { satisfies } from 'semver';
+import satisfies from 'semver/functions/satisfies.js';
 import { kebabCase } from '../utils/kebab-case';
 
-export const DEFAULT_ICON_SOURCES: ReadonlyArray<RegExp> = [
-  /^react-icons\/[\w-]+$/,
-  /^@fortawesome\/[\w-]+-svg-icons$/,
-  /^lucide-react$/,
-  /^@heroicons\/react(?:\/.*)?$/,
-  /^@tabler\/icons-react$/,
-  /^@radix-ui\/react-icons$/,
-  /^phosphor-react$/,
-  /^@phosphor-icons\/react$/,
-  /^react-feather$/,
-  /^react-bootstrap-icons$/,
-  /^grommet-icons$/,
-  /^@remixicon\/react$/,
-  /^devicons-react$/,
-  /^@mui\/icons-material(?:\/.*)?$/,
-  /^@carbon\/icons-react$/,
-  /^@ant-design\/icons(?:\/.*)?$/,
-  /^@fluentui\/react-icons(?:\/svg\/[\w-]+)?$/,
-  /^@primer\/octicons-react$/,
-  /^@hugeicons\/core-free-icons(?:\/.*)?$/,
-  /^@pillage-first\/graphics$/,
-];
-
-type ImportResolver = (pack: string, exportName: string) => string;
+export type ImportResolver = (pack: string, exportName: string) => string;
 
 type VersionedImportResolver = {
   range: string;
@@ -281,18 +258,21 @@ const resolversFor = (
 export const hasVersionedIconResolver = (pack: string): boolean =>
   resolversFor(pack) !== undefined;
 
+export const selectIconImportResolver = (
+  pack: string,
+  version?: string,
+): ImportResolver => {
+  const resolver = version
+    ? resolversFor(pack)?.find(({ range }) =>
+        satisfies(version, range, { includePrerelease: true }),
+      )
+    : undefined;
+
+  return resolver?.resolve ?? ((source) => source);
+};
+
 export const resolveIconImport = (
   pack: string,
   exportName: string,
   version?: string,
-): string => {
-  if (!version) {
-    return pack;
-  }
-
-  const resolver = resolversFor(pack)?.find(({ range }) =>
-    satisfies(version, range, { includePrerelease: true }),
-  );
-
-  return resolver?.resolve(pack, exportName) ?? pack;
-};
+): string => selectIconImportResolver(pack, version)(pack, exportName);

@@ -1,3 +1,5 @@
+import satisfies from 'semver/functions/satisfies.js';
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import {
   hasVersionedIconResolver,
@@ -304,4 +306,35 @@ describe('resolveIconImport', () => {
       expect(resolveIconImport(pack, 'Alarm', '1.0.0')).toBe(pack);
     },
   );
+});
+
+test.each([
+  ['@ant-design/icons', '4.0.0'],
+  ['@carbon/icons-react', '10.4.0'],
+  ['@fluentui/react-icons', '0.1.1'],
+  ['@fortawesome/free-solid-svg-icons', '5.1.0'],
+  ['@fortawesome/react-fontawesome', '0.1.0'],
+  ['@heroicons/react', '0.1.0'],
+  ['@hugeicons/core-free-icons', '1.0.0'],
+  ['@mui/icons-material', '5.0.0-beta.0'],
+  ['@phosphor-icons/react', '2.0.3'],
+  ['@phosphor-icons/react', '2.1.8-rc.0'],
+  ['@primer/octicons-react', '10.0.0'],
+  ['@radix-ui/react-icons', '2.0.0-rc.1776195498999'],
+  ['@remixicon/react', '0.0.2'],
+  ['@tabler/icons-react', '2.0.0'],
+  ['@tabler/icons-react', '3.0.0-beta.2'],
+  ['devicons-react', '0.1.0'],
+  ['devicons-react', '1.2.3-canary-0.0.1'],
+  ['grommet-icons', '0.1.0'],
+  ['lucide-react', '0.104.0'],
+  ['phosphor-react', '0.1.0'],
+  ['react-bootstrap-icons', '1.0.0-beta.0'],
+  ['react-feather', '1.0.2'],
+  ['react-icons', '3.0.0'],
+])('permits supported %s %s in peer dependencies', (pack, version) => {
+  const { peerDependencies } = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  );
+  expect(satisfies(version, peerDependencies[pack])).toBe(true);
 });

@@ -1,7 +1,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { collector } from '../src/collector';
-import loader from '../src/webpack/loader';
-import type { ReactIconsSpritePluginOptions } from '../src/plugin-options';
+import loader, {
+  type ReactIconsSpriteWebpackLoaderOptions,
+} from '../src/webpack/loader';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -14,7 +15,7 @@ test.each([undefined, /^lucide-react$/, [/^lucide-react$/]])(
     const add = vi.spyOn(collector, 'add').mockImplementation(() => {});
     const emitWarning = vi.fn();
     const getOptions = vi.fn(
-      (): ReactIconsSpritePluginOptions => ({ exclude }),
+      (): ReactIconsSpriteWebpackLoaderOptions => ({ exclude }),
     );
     const context = {
       mode: 'production',

@@ -5,7 +5,8 @@ import { createElement, type ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   hasVersionedIconResolver,
-  resolveIconImport,
+  selectIconImportResolver,
+  type ImportResolver,
 } from '../packs/icon-resolvers';
 
 export type RenderedIcon = {
@@ -40,6 +41,35 @@ type RenderIconOptions = {
   importPath?: string;
 };
 
+type PackageInfo = {
+  manifest: PackageJson;
+  resolveImport: ImportResolver;
+};
+
+type ResolutionCache = {
+  roots: Map<string, string | null>;
+  packages: Map<string, PackageInfo>;
+};
+
+const readPackageInfo = (
+  packageRoot: string,
+  packageName: string,
+  cache: ResolutionCache,
+): PackageInfo => {
+  let info = cache.packages.get(packageRoot);
+  if (!info) {
+    const manifest = JSON.parse(
+      readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
+    ) as PackageJson;
+    info = {
+      manifest,
+      resolveImport: selectIconImportResolver(packageName, manifest.version),
+    };
+    cache.packages.set(packageRoot, info);
+  }
+  return info;
+};
+
 const parsePackageSpecifier = (
   specifier: string,
 ): { packageName: string; subpath: string } | null => {
@@ -62,16 +92,24 @@ const parsePackageSpecifier = (
 const findPackageRoot = (
   packageName: string,
   baseDir: string,
+  cache: ResolutionCache,
 ): string | null => {
   let current = path.resolve(baseDir);
+  const key = JSON.stringify([packageName, current]);
+  const cachedRoot = cache.roots.get(key);
+  if (cachedRoot !== undefined) {
+    return cachedRoot;
+  }
   while (true) {
     const candidate = path.join(current, 'node_modules', packageName);
     if (existsSync(path.join(candidate, 'package.json'))) {
+      cache.roots.set(key, candidate);
       return candidate;
     }
 
     const parent = path.dirname(current);
     if (parent === current) {
+      cache.roots.set(key, null);
       return null;
     }
     current = parent;
@@ -169,10 +207,8 @@ const resolveFileCandidate = (filePath: string): string | null => {
 const resolveFromPackageRoot = (
   packageRoot: string,
   subpath: string,
+  packageJson: PackageJson,
 ): string | null => {
-  const packageJson = JSON.parse(
-    readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
-  ) as PackageJson;
   const exportTarget = resolveExportTarget(packageJson.exports, subpath);
 
   if (exportTarget) {
@@ -195,20 +231,26 @@ const resolveFromPackageRoot = (
 const resolveFromBaseDir = (
   specifier: string,
   baseDir: string,
+  cache: ResolutionCache,
 ): string | null => {
   const parsed = parsePackageSpecifier(specifier);
   if (!parsed) {
     return null;
   }
-  const packageRoot = findPackageRoot(parsed.packageName, baseDir);
+  const packageRoot = findPackageRoot(parsed.packageName, baseDir, cache);
   return packageRoot
-    ? resolveFromPackageRoot(packageRoot, parsed.subpath)
+    ? resolveFromPackageRoot(
+        packageRoot,
+        parsed.subpath,
+        readPackageInfo(packageRoot, parsed.packageName, cache).manifest,
+      )
     : null;
 };
 
 const resolveImportSpecifier = (
   specifier: string,
   options: RenderIconOptions,
+  cache: ResolutionCache,
 ): string => {
   if (path.isAbsolute(specifier)) {
     const resolved = resolveFileCandidate(specifier);
@@ -229,7 +271,7 @@ const resolveImportSpecifier = (
     return specifier;
   }
 
-  const resolved = resolveFromBaseDir(specifier, options.baseDir);
+  const resolved = resolveFromBaseDir(specifier, options.baseDir, cache);
   return resolved ? pathToFileURL(resolved).href : specifier;
 };
 
@@ -398,13 +440,14 @@ const renderHugeiconsIconDefinition = (
   };
 };
 
-export const renderIcon = async (
+const renderIconWithCache = async (
   pack: string,
   exportName: string,
-  options: RenderIconOptions = {},
+  options: RenderIconOptions,
+  cache: ResolutionCache,
 ): Promise<RenderedIcon> => {
   let packageRoot: string | null = null;
-  let version: string | undefined;
+  let packageInfo: PackageInfo | undefined;
   const packageName = parsePackageSpecifier(pack)?.packageName ?? pack;
   if (!options.importPath && hasVersionedIconResolver(pack)) {
     const baseDir = options.baseDir ?? process.cwd();
@@ -412,23 +455,20 @@ export const renderIcon = async (
       ? path.dirname(options.importer.split('?', 1)[0])
       : baseDir;
     packageRoot =
-      findPackageRoot(packageName, importerDir) ??
-      findPackageRoot(packageName, baseDir);
+      findPackageRoot(packageName, importerDir, cache) ??
+      findPackageRoot(packageName, baseDir, cache);
     if (packageRoot) {
-      const packageJson = JSON.parse(
-        readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
-      ) as PackageJson;
-      version = packageJson.version;
+      packageInfo = readPackageInfo(packageRoot, packageName, cache);
     }
   }
 
   const importPath =
-    options.importPath ?? resolveIconImport(pack, exportName, version);
+    options.importPath ?? packageInfo?.resolveImport(pack, exportName) ?? pack;
   let specifier = importPath;
-  if (packageRoot) {
+  if (packageRoot && packageInfo) {
     const subpath = parsePackageSpecifier(importPath)?.subpath ?? '.';
     specifier =
-      resolveFromPackageRoot(packageRoot, subpath) ??
+      resolveFromPackageRoot(packageRoot, subpath, packageInfo.manifest) ??
       path.join(packageRoot, subpath === '.' ? 'index.js' : subpath);
   }
   if (
@@ -444,7 +484,7 @@ export const renderIcon = async (
     );
   }
   const imported = (await import(
-    resolveImportSpecifier(specifier, options)
+    resolveImportSpecifier(specifier, options, cache)
   )) as Record<string, unknown>;
   const iconComponent = unwrapNestedDefaultExport(
     pickExport(
@@ -494,3 +534,16 @@ export const renderIcon = async (
     symbolAttributes,
   };
 };
+
+// Share resolution work within a sprite build; each new build starts fresh.
+export const createIconRenderer = () => {
+  const cache: ResolutionCache = { roots: new Map(), packages: new Map() };
+  return (pack: string, exportName: string, options: RenderIconOptions = {}) =>
+    renderIconWithCache(pack, exportName, options, cache);
+};
+
+export const renderIcon = (
+  pack: string,
+  exportName: string,
+  options: RenderIconOptions = {},
+): Promise<RenderedIcon> => createIconRenderer()(pack, exportName, options);

@@ -7,7 +7,13 @@ import {
 } from '../plugin-options';
 import type { LoaderDefinitionFunction } from 'webpack';
 
-type SpriteLoader = LoaderDefinitionFunction<ReactIconsSpritePluginOptions>;
+export type ReactIconsSpriteWebpackLoaderOptions = Pick<
+  ReactIconsSpritePluginOptions,
+  'exclude'
+>;
+
+type SpriteLoader =
+  LoaderDefinitionFunction<ReactIconsSpriteWebpackLoaderOptions>;
 
 const reactIconsSpriteLoader: SpriteLoader = async function (
   this,
