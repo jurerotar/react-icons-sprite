@@ -12,6 +12,7 @@ type Scope = {
   functionScope: boolean;
   bindings: Record<string, Binding | undefined>;
   resolved: Record<string, Binding | null | undefined>;
+  references?: (Identifier | Extract<Node, { type: 'JSXIdentifier' }>)[];
 };
 export type ScopedNode<T extends Node> = { node: T; scope: Scope };
 
@@ -31,14 +32,12 @@ export const analyzeModule = (ast: Program) => {
   const elements: ScopedNode<JSXElement>[] = [];
   const names = new Set<string>();
   const bindings: Binding[] = [];
-  const references: ScopedNode<
-    Identifier | Extract<Node, { type: 'JSXIdentifier' }>
-  >[] = [];
   const root: Scope = {
     functionScope: true,
     bindings: Object.create(null),
     resolved: Object.create(null),
   };
+  const scopes = [root];
   const tracked = new Set<string>();
   for (const node of ast.body) {
     if (node.type !== 'ImportDeclaration') {
@@ -109,7 +108,8 @@ export const analyzeModule = (ast: Program) => {
         parent &&
         isReferenced(node, parent, grandparent)
       ) {
-        references.push({ node, scope: inherited });
+        inherited.references ??= [];
+        inherited.references.push(node);
       }
       return;
     }
@@ -190,6 +190,7 @@ export const analyzeModule = (ast: Program) => {
         bindings: Object.create(null),
         resolved: Object.create(null),
       };
+      scopes.push(scope);
     }
     if ('params' in node && isFunction) {
       for (const parameter of node.params) {
@@ -249,10 +250,10 @@ export const analyzeModule = (ast: Program) => {
   };
   walk(ast, root);
   // Resolve only after every declaration is collected, including hoisted and TDZ bindings.
-  for (const reference of references) {
-    getBinding(reference.scope, reference.node.name)?.references.push(
-      reference.node,
-    );
+  for (const scope of scopes) {
+    for (const reference of scope.references ?? []) {
+      getBinding(scope, reference.name)?.references.push(reference);
+    }
   }
   return { imports, elements, names, bindings };
 };

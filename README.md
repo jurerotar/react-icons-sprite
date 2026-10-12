@@ -139,6 +139,9 @@ The raw-transfer API is experimental, so the Oxc version is pinned. From the rep
 `npm exec --workspace react-icons-sprite -- vitest bench --run` to benchmark direct icon usages, component references,
 mixed usages, repeated usages with the real icon collector, and pass-through modules without supported icon imports.
 Each transformed icon is registered once per module, including when it is imported under multiple aliases.
+Import sources are checked once per declaration, aliases share icon metadata, and replacement strings are built
+only for icons that are used. The benchmarks include 1, 12, 60, and 240 usages, plus a large import with one usage;
+transforms per second depend heavily on module size, so compare the same fixture when measuring changes.
 
 | icon (pack)             | react-icons icon render mean time | react-icons-sprite icon render mean time | Relative difference |
 |-------------------------|----------------------------------:|-----------------------------------------:|--------------------:|

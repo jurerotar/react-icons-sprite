@@ -100,6 +100,34 @@ const mixedCode = `
 `;
 
 describe('transformModule benchmark', () => {
+  for (const count of [1, 12, 60]) {
+    test(`transforms ${count} direct icons`, async ({ bench }) => {
+      const input =
+        'import { Circle } from "lucide-react"; export const A=()=> <>' +
+        '<Circle />'.repeat(count) +
+        '</>;';
+      expect(
+        transformModule(input, id, () => {}).code.match(/iconId=/g),
+      ).toHaveLength(count);
+      const result = await bench('transformModule', () =>
+        transformModule(input, id, () => {}),
+      ).run({ time: 1500, warmupTime: 500 });
+      report(`direct JSX (${count} usages)`, result);
+    });
+  }
+  test('transforms one icon from a large import', async ({ bench }) => {
+    const input =
+      'import { Circle, ' +
+      Array.from({ length: 500 }, (_, i) => `Icon${i}`).join(',') +
+      ' } from "lucide-react"; export const A=()=> <Circle />;';
+    expect(
+      transformModule(input, id, () => {}).code.match(/iconId=/g),
+    ).toHaveLength(1);
+    const result = await bench('transformModule', () =>
+      transformModule(input, id, () => {}),
+    ).run({ time: 1500, warmupTime: 500 });
+    report('one usage, 501 imported icons', result);
+  });
   test('transforms repeated icons with the real collector', async ({
     bench,
   }) => {

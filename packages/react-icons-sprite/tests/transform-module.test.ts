@@ -382,6 +382,21 @@ describe('transformModule', () => {
     ]);
   });
 
+  test('retains a live alias when another alias of the same icon is transformed', () => {
+    const used: string[] = [];
+    const input = `import { Circle, Circle as Ring } from "lucide-react";
+      export const inline = Circle;
+      export const A = () => <Ring />;`;
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push(`${pack}:${exportName}`);
+    });
+    expect(result.code).toContain('import { Circle } from "lucide-react"');
+    expect(result.code).toContain('export const inline = Circle;');
+    expect(result.code).not.toContain('Circle as Ring');
+    expect(result.code).toContain('iconId="ri-lucide-react-Circle"');
+    expect(used).toEqual(['lucide-react:Circle']);
+  });
+
   test('does not add a duplicate iconId prop', () => {
     const used: Array<{ pack: string; exportName: string }> = [];
     const input = `import { Circle } from "lucide-react";\nexport const A = () => <Circle iconId="custom" />;`;

@@ -1,7 +1,7 @@
 import type { Program, ImportDeclaration, JSXElement, Node } from 'oxc-parser';
 import type { SourceMap } from 'magic-string';
 import { DEFAULT_ICON_SOURCES } from '../packs/icon-sources';
-import { computeIconId } from '../utils/compute-icon-id';
+import { normalizePackAlias } from '../utils/compute-icon-id';
 import { applyEdits, applyEditsToString } from './edit-applier';
 import type { EditOperation } from './edit-builder';
 import { fastFilter } from './fast-filter';
@@ -33,8 +33,7 @@ type TransformModuleOptions = {
 type IconSymbol = {
   pack: string;
   exportName: string;
-  registrationKey: string;
-  iconId: string;
+  idPrefix: string;
   definition: boolean;
   openingReplacement: string;
   referenceReplacement: string;
@@ -148,11 +147,21 @@ export const transformModule = (
   }
 
   const icons = new Map<Binding, IconSymbol>();
+  const symbols = new Map<string, Map<string, IconSymbol>>();
   const wrappers = new Map<Binding, string>();
   const { imports, elements, names, bindings } = analyzeModule(ast);
   let spriteBinding: Binding | undefined;
   for (const path of imports) {
     const pack = path.node.source.value;
+    const supported =
+      matches(sources, pack) && !matches(options.excludedSources ?? [], pack);
+    const definition = supported && isDefinition(pack);
+    const idPrefix = supported ? `ri-${normalizePackAlias(pack)}-` : '';
+    let exports = symbols.get(pack);
+    if (supported && !exports) {
+      exports = new Map();
+      symbols.set(pack, exports);
+    }
     for (const specifier of path.node.specifiers) {
       if (
         path.node.importKind === 'type' ||
@@ -176,19 +185,20 @@ export const transformModule = (
       ) {
         wrappers.set(binding, pack);
       }
-      if (
-        matches(sources, pack) &&
-        !matches(options.excludedSources ?? [], pack)
-      ) {
-        icons.set(binding, {
-          pack,
-          exportName,
-          registrationKey: JSON.stringify([pack, exportName]),
-          iconId: computeIconId(pack, exportName),
-          definition: isDefinition(pack),
-          openingReplacement: '',
-          referenceReplacement: '',
-        });
+      if (supported && exports) {
+        let symbol = exports.get(exportName);
+        if (!symbol) {
+          symbol = {
+            pack,
+            exportName,
+            idPrefix,
+            definition,
+            openingReplacement: '',
+            referenceReplacement: '',
+          };
+          exports.set(exportName, symbol);
+        }
+        icons.set(binding, symbol);
       }
     }
   }
@@ -210,10 +220,10 @@ export const transformModule = (
     }
   }
 
-  for (const icon of icons.values()) {
-    icon.openingReplacement = `${componentName} iconId="${icon.iconId}"`;
-    icon.referenceReplacement = `(props) => <${componentName} {...props} iconId="${icon.iconId}" />`;
-  }
+  const openingReplacement = (icon: IconSymbol) =>
+    (icon.openingReplacement ||= `${componentName} iconId="${icon.idPrefix}${icon.exportName}"`);
+  const referenceReplacement = (icon: IconSymbol) =>
+    (icon.referenceReplacement ||= `(props) => <${componentName} {...props} iconId="${icon.idPrefix}${icon.exportName}" />`);
 
   const edits: EditOperation[] = [];
   const replaced = new Set<Node>();
@@ -247,7 +257,7 @@ export const transformModule = (
     if (binding && direct && !direct.definition) {
       replace(
         opening.name,
-        hasIconId(path) ? componentName : direct.openingReplacement,
+        hasIconId(path) ? componentName : openingReplacement(direct),
       );
       if (path.node.closingElement) {
         replace(path.node.closingElement.name, componentName);
@@ -285,7 +295,7 @@ export const transformModule = (
       }
       replace(
         opening.name,
-        hasIconId(path) ? componentName : icon.openingReplacement,
+        hasIconId(path) ? componentName : openingReplacement(icon),
       );
       if (path.node.closingElement) {
         replace(path.node.closingElement.name, componentName);
@@ -315,18 +325,18 @@ export const transformModule = (
       if (!iconBinding || !icon || icon.definition) {
         continue;
       }
-      replace(expression, icon.referenceReplacement);
+      replace(expression, referenceReplacement(icon));
       usedImports.add(iconBinding);
       registrations[1].push(icon);
     }
   }
-  const registered = new Set<string>();
+  const registered = new Set<IconSymbol>();
   for (const bucket of registrations) {
     for (const icon of bucket) {
-      if (registered.has(icon.registrationKey)) {
+      if (registered.has(icon)) {
         continue;
       }
-      registered.add(icon.registrationKey);
+      registered.add(icon);
       register(icon.pack, icon.exportName);
     }
   }
