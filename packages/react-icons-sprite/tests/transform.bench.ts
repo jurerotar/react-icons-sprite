@@ -1,5 +1,6 @@
 import { describe, expect, test, type BenchResult } from 'vitest';
 import { transformModule } from '../src/transform/transform-module';
+import { createCollector } from '../src/collector/create-collector';
 
 const report = (scenario: string, result: BenchResult) => {
   process.stdout.write(
@@ -99,6 +100,25 @@ const mixedCode = `
 `;
 
 describe('transformModule benchmark', () => {
+  test('transforms repeated icons with the real collector', async ({
+    bench,
+  }) => {
+    const run = () => {
+      const collector = createCollector();
+      const transformed = transformModule(code, id, (pack, exportName) => {
+        collector.add(pack, exportName, { importer: id });
+      });
+      return { transformed, collector };
+    };
+    const { transformed, collector } = run();
+    expect(transformed.code.match(/iconId=/g)).toHaveLength(240);
+    expect(collector.toList()).toHaveLength(9);
+    const result = await bench('transformModule with collector', run).run({
+      time: 1500,
+      warmupTime: 500,
+    });
+    report('direct JSX with collector (240 usages, 9 icons)', result);
+  });
   test('passes through JSX without supported icon imports', async ({
     bench,
   }) => {

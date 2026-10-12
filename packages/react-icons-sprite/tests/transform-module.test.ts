@@ -359,9 +359,26 @@ describe('transformModule', () => {
     expect(result.anyReplacements).toBe(true);
     expect(result.code).toContain('iconId="ri-lucide-react-Circle"');
     expect(result.code).not.toContain('Ring');
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'Circle' }]);
+  });
+
+  test('deduplicates aliases and reference props while preserving registration phase order', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `
+      import { Circle, Circle as Ring, Square } from "lucide-react";
+      import { Circle as FeatherCircle } from "react-feather";
+      export const A = () => <Button icon={Square}><Ring /><Circle /><FeatherCircle /><Button icon={Circle} /></Button>;
+    `;
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code.match(/iconId=/g)).toHaveLength(5);
     expect(used).toEqual([
       { pack: 'lucide-react', exportName: 'Circle' },
-      { pack: 'lucide-react', exportName: 'Circle' },
+      { pack: 'react-feather', exportName: 'Circle' },
+      { pack: 'lucide-react', exportName: 'Square' },
     ]);
   });
 

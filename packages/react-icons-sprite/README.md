@@ -137,7 +137,8 @@ Build-time transforms use Oxc parsing and targeted scope analysis to preserve co
 bindings. Raw AST transfer is enabled when Oxc reports runtime support; otherwise standard parsing is used.
 The raw-transfer API is experimental, so the Oxc version is pinned. From the repository root, run
 `npm exec --workspace react-icons-sprite -- vitest bench --run` to benchmark direct icon usages, component references,
-mixed usages, and pass-through modules without supported icon imports.
+mixed usages, repeated usages with the real icon collector, and pass-through modules without supported icon imports.
+Each transformed icon is registered once per module, including when it is imported under multiple aliases.
 
 | icon (pack)             | react-icons icon render mean time | react-icons-sprite icon render mean time | Relative difference |
 |-------------------------|----------------------------------:|-----------------------------------------:|--------------------:|

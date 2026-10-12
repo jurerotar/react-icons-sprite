@@ -33,6 +33,7 @@ type TransformModuleOptions = {
 type IconSymbol = {
   pack: string;
   exportName: string;
+  registrationKey: string;
   iconId: string;
   definition: boolean;
   openingReplacement: string;
@@ -182,6 +183,7 @@ export const transformModule = (
         icons.set(binding, {
           pack,
           exportName,
+          registrationKey: JSON.stringify([pack, exportName]),
           iconId: computeIconId(pack, exportName),
           definition: isDefinition(pack),
           openingReplacement: '',
@@ -318,8 +320,13 @@ export const transformModule = (
       registrations[1].push(icon);
     }
   }
+  const registered = new Set<string>();
   for (const bucket of registrations) {
     for (const icon of bucket) {
+      if (registered.has(icon.registrationKey)) {
+        continue;
+      }
+      registered.add(icon.registrationKey);
       register(icon.pack, icon.exportName);
     }
   }
