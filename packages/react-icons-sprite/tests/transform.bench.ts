@@ -1,5 +1,17 @@
-import { describe, test } from 'vitest';
+import { describe, expect, test, type BenchResult } from 'vitest';
 import { transformModule } from '../src/transform/transform-module';
+
+const report = (scenario: string, result: BenchResult) => {
+  process.stdout.write(
+    `${JSON.stringify({
+      implementation: 'Oxc (raw transfer where supported)',
+      scenario,
+      transformationsPerSecond: Number((1000 / result.latency.mean).toFixed(2)),
+      meanMs: Number(result.latency.mean.toFixed(5)),
+      latencyRmePercent: Number(result.latency.rme.toFixed(2)),
+    })}\n`,
+  );
+};
 
 const id = 'BenchmarkComponent.tsx';
 
@@ -87,25 +99,50 @@ const mixedCode = `
 `;
 
 describe('transformModule benchmark', () => {
+  test('passes through JSX without supported icon imports', async ({
+    bench,
+  }) => {
+    const input = code.replaceAll('react-icons/', 'other-icons/');
+    expect(transformModule(input, id, () => {})).toMatchObject({
+      code: input,
+      anyReplacements: false,
+    });
+    const result = await bench('transformModule', () => {
+      transformModule(input, id, () => {});
+    }).run({ time: 1000, warmupTime: 300 });
+    report('non-icon JSX (240 elements)', result);
+  });
   test('transforms a component with many icon usages', async ({ bench }) => {
-    await bench('transformModule', () => {
+    const transformed = transformModule(code, id, () => {});
+    expect(transformed.anyReplacements).toBe(true);
+    expect(transformed.code.match(/iconId=/g)).toHaveLength(240);
+    const result = await bench('transformModule', () => {
       transformModule(code, id, () => {});
-    }).run();
+    }).run({ time: 1500, warmupTime: 500 });
+    report('direct JSX (240 usages)', result);
   });
 
   test('transforms a component with many reference prop icon usages', async ({
     bench,
   }) => {
-    await bench('transformModule', () => {
+    const transformed = transformModule(referenceCode, id, () => {});
+    expect(transformed.anyReplacements).toBe(true);
+    expect(transformed.code.match(/iconId=/g)).toHaveLength(240);
+    const result = await bench('transformModule', () => {
       transformModule(referenceCode, id, () => {});
-    }).run();
+    }).run({ time: 1500, warmupTime: 500 });
+    report('reference props (240 usages)', result);
   });
 
   test('transforms a component with mixed component and reference icon usages', async ({
     bench,
   }) => {
-    await bench('transformModule', () => {
+    const transformed = transformModule(mixedCode, id, () => {});
+    expect(transformed.anyReplacements).toBe(true);
+    expect(transformed.code.match(/iconId=/g)).toHaveLength(240);
+    const result = await bench('transformModule', () => {
       transformModule(mixedCode, id, () => {});
-    }).run();
+    }).run({ time: 1500, warmupTime: 500 });
+    report('mixed (240 usages)', result);
   });
 });

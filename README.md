@@ -133,9 +133,11 @@ This is a big win when you’re rendering icons in lists, tables, or maps where 
 
 ### Performance comparison
 
-Build-time transforms use syntax parsing and lexical scope analysis to preserve comments, strings, and shadowed
-bindings. From the repository root, run `npm exec --workspace react-icons-sprite -- vitest bench --run` to benchmark
-direct icon usages, component references, and mixed usages.
+Build-time transforms use Oxc parsing and targeted scope analysis to preserve comments, strings, and shadowed
+bindings. Raw AST transfer is enabled when Oxc reports runtime support; otherwise standard parsing is used.
+The raw-transfer API is experimental, so the Oxc version is pinned. From the repository root, run
+`npm exec --workspace react-icons-sprite -- vitest bench --run` to benchmark direct icon usages, component references,
+mixed usages, and pass-through modules without supported icon imports.
 
 | icon (pack)             | react-icons icon render mean time | react-icons-sprite icon render mean time | Relative difference |
 |-------------------------|----------------------------------:|-----------------------------------------:|--------------------:|

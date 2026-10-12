@@ -1,17 +1,20 @@
-import { parse } from '@babel/parser';
-import traverseModule, { type Binding, type NodePath } from '@babel/traverse';
-import type { ImportDeclaration, JSXElement, Node } from '@babel/types';
+import type { Program, ImportDeclaration, JSXElement, Node } from 'oxc-parser';
 import type { SourceMap } from 'magic-string';
 import { DEFAULT_ICON_SOURCES } from '../packs/icon-sources';
 import { computeIconId } from '../utils/compute-icon-id';
 import { applyEdits, applyEditsToString } from './edit-applier';
 import type { EditOperation } from './edit-builder';
 import { fastFilter } from './fast-filter';
+import { createModuleParser } from './parse-module';
+import {
+  analyzeModule,
+  getBinding as lookupBinding,
+  type Binding,
+  type ScopedNode,
+} from './analyze-module';
 
-// Babel's CommonJS entry exposes its visitor as a nested default in Node ESM.
-const traverse =
-  (traverseModule as unknown as { default: typeof traverseModule }).default ??
-  traverseModule;
+const getBinding = lookupBinding;
+const parseModule = createModuleParser();
 
 export const ICON_SOURCE = 'react-icons-sprite';
 export const ICON_COMPONENT_NAME = 'ReactIconsSpriteIcon';
@@ -27,7 +30,14 @@ type TransformModuleOptions = {
   excludedSources?: readonly RegExp[];
 };
 
-type IconSymbol = { pack: string; exportName: string; iconId: string };
+type IconSymbol = {
+  pack: string;
+  exportName: string;
+  iconId: string;
+  definition: boolean;
+  openingReplacement: string;
+  referenceReplacement: string;
+};
 const matches = (sources: readonly RegExp[], pack: string): boolean =>
   sources.some((source) => {
     source.lastIndex = 0;
@@ -37,6 +47,56 @@ const matches = (sources: readonly RegExp[], pack: string): boolean =>
 const isDefinition = (pack: string): boolean =>
   /^@fortawesome\/[\w-]+-svg-icons$/.test(pack) ||
   /^@hugeicons\/core-free-icons(?:\/.*)?$/.test(pack);
+
+// Only a conservative hint: exact matching and decoding still happen later.
+const defaultSourceHints = DEFAULT_ICON_SOURCES.map((source) => {
+  const pattern = source.source;
+  let prefix = '';
+  for (let index = 1; index < pattern.length; index++) {
+    const char = pattern[index];
+    if (char === '(' || char === '[' || char === '$') {
+      break;
+    }
+    if (char === '\\' && pattern[index + 1] === '/') {
+      index++;
+    }
+    prefix += pattern[index];
+  }
+  return prefix;
+});
+
+const hasPossibleIconSource = (
+  code: string,
+  sources: readonly RegExp[],
+  excluded: readonly RegExp[],
+): boolean => {
+  // Escaped package names need the parser to decode them. Otherwise inspect
+  // every quote independently: quotes in comments cannot hide a real import.
+  if (code.includes('\\')) {
+    return true;
+  }
+  if (
+    sources === DEFAULT_ICON_SOURCES &&
+    !defaultSourceHints.some((hint) => code.includes(hint))
+  ) {
+    return false;
+  }
+  for (let index = 0; index < code.length; index++) {
+    const quote = code[index];
+    if (quote !== '"' && quote !== "'") {
+      continue;
+    }
+    const end = code.indexOf(quote, index + 1);
+    if (end === -1) {
+      continue;
+    }
+    const candidate = code.slice(index + 1, end);
+    if (matches(sources, candidate) && !matches(excluded, candidate)) {
+      return true;
+    }
+  }
+  return false;
+};
 
 const range = (node: Node): [number, number] => [node.start!, node.end!];
 const importedName = (node: ImportDeclaration['specifiers'][number]): string =>
@@ -56,81 +116,80 @@ export const transformModule = (
   options: TransformModuleOptions = {},
 ): TransformResult => {
   const unchanged = { code, map: null, anyReplacements: false };
-  if (!fastFilter(code)) {
+  if (
+    !fastFilter(code) ||
+    !hasPossibleIconSource(code, sources, options.excludedSources ?? [])
+  ) {
     return unchanged;
   }
 
-  let ast: ReturnType<typeof parse>;
+  let ast: Program;
   try {
-    ast = parse(code, {
-      sourceType: 'unambiguous',
-      plugins: ['jsx', 'typescript'],
-    });
+    const parsed = parseModule(id, code);
+    if (!parsed) {
+      return unchanged;
+    }
+    ast = parsed;
   } catch {
     // Unsupported syntax must remain inline rather than receive partial edits.
     return unchanged;
   }
 
+  if (
+    !ast.body.some(
+      (node) =>
+        node.type === 'ImportDeclaration' &&
+        matches(sources, node.source.value) &&
+        !matches(options.excludedSources ?? [], node.source.value),
+    )
+  ) {
+    return unchanged;
+  }
+
   const icons = new Map<Binding, IconSymbol>();
   const wrappers = new Map<Binding, string>();
-  const imports: NodePath<ImportDeclaration>[] = [];
-  const elements: NodePath<JSXElement>[] = [];
-  const names = new Set<string>();
-  const bindings: Binding[] = [];
+  const { imports, elements, names, bindings } = analyzeModule(ast);
   let spriteBinding: Binding | undefined;
-
-  traverse(ast, {
-    Identifier(path) {
-      names.add(path.node.name);
-    },
-    JSXIdentifier(path) {
-      names.add(path.node.name);
-    },
-    Scopable(path) {
-      bindings.push(...Object.values(path.scope.bindings));
-    },
-    ImportDeclaration(path) {
-      imports.push(path);
-      const pack = path.node.source.value;
-      for (const specifier of path.node.specifiers) {
-        if (
-          path.node.importKind === 'type' ||
-          (specifier.type === 'ImportSpecifier' &&
-            specifier.importKind === 'type')
-        ) {
-          continue;
-        }
-        const binding = path.scope.getBinding(specifier.local.name);
-        if (!binding || specifier.type === 'ImportNamespaceSpecifier') {
-          continue;
-        }
-        const exportName = importedName(specifier);
-        if (pack === ICON_SOURCE && exportName === ICON_COMPONENT_NAME) {
-          spriteBinding = binding;
-        }
-        if (
-          (pack === '@fortawesome/react-fontawesome' &&
-            exportName === 'FontAwesomeIcon') ||
-          (pack === '@hugeicons/react' && exportName === 'HugeiconsIcon')
-        ) {
-          wrappers.set(binding, pack);
-        }
-        if (
-          matches(sources, pack) &&
-          !matches(options.excludedSources ?? [], pack)
-        ) {
-          icons.set(binding, {
-            pack,
-            exportName,
-            iconId: computeIconId(pack, exportName),
-          });
-        }
+  for (const path of imports) {
+    const pack = path.node.source.value;
+    for (const specifier of path.node.specifiers) {
+      if (
+        path.node.importKind === 'type' ||
+        (specifier.type === 'ImportSpecifier' &&
+          specifier.importKind === 'type')
+      ) {
+        continue;
       }
-    },
-    JSXElement(path) {
-      elements.push(path);
-    },
-  });
+      const binding = getBinding(path.scope, specifier.local.name);
+      if (!binding || specifier.type === 'ImportNamespaceSpecifier') {
+        continue;
+      }
+      const exportName = importedName(specifier);
+      if (pack === ICON_SOURCE && exportName === ICON_COMPONENT_NAME) {
+        spriteBinding = binding;
+      }
+      if (
+        (pack === '@fortawesome/react-fontawesome' &&
+          exportName === 'FontAwesomeIcon') ||
+        (pack === '@hugeicons/react' && exportName === 'HugeiconsIcon')
+      ) {
+        wrappers.set(binding, pack);
+      }
+      if (
+        matches(sources, pack) &&
+        !matches(options.excludedSources ?? [], pack)
+      ) {
+        icons.set(binding, {
+          pack,
+          exportName,
+          iconId: computeIconId(pack, exportName),
+          definition: isDefinition(pack),
+          openingReplacement: '',
+          referenceReplacement: '',
+        });
+      }
+    }
+  }
   if (!icons.size) {
     return unchanged;
   }
@@ -149,26 +208,27 @@ export const transformModule = (
     }
   }
 
+  for (const icon of icons.values()) {
+    icon.openingReplacement = `${componentName} iconId="${icon.iconId}"`;
+    icon.referenceReplacement = `(props) => <${componentName} {...props} iconId="${icon.iconId}" />`;
+  }
+
   const edits: EditOperation[] = [];
-  const replaced: Array<[number, number]> = [];
+  const replaced = new Set<Node>();
   const usedImports = new Set<Binding>();
-  const directElements = new Set<JSXElement>();
+  const registrations: IconSymbol[][] = [[], [], []];
   const replace = (node: Node, value: string) => {
-    const [from, to] = range(node);
-    edits.push({ type: 'replace', from, to, value });
-    replaced.push([from, to]);
+    edits.push({ type: 'replace', from: node.start, to: node.end, value });
+    replaced.add(node);
   };
-  const recordIcon = (binding: Binding, icon: IconSymbol) => {
-    usedImports.add(binding);
-    register(icon.pack, icon.exportName);
-  };
-  const elementBinding = (path: NodePath<JSXElement>) => {
+
+  const elementBinding = (path: ScopedNode<JSXElement>) => {
     const name = path.node.openingElement.name;
     return name.type === 'JSXIdentifier'
-      ? path.scope.getBinding(name.name)
+      ? getBinding(path.scope, name.name)
       : undefined;
   };
-  const hasIconId = (path: NodePath<JSXElement>) =>
+  const hasIconId = (path: ScopedNode<JSXElement>) =>
     path.node.openingElement.attributes.some(
       (attr) =>
         attr.type === 'JSXAttribute' &&
@@ -176,32 +236,70 @@ export const transformModule = (
         attr.name.name === 'iconId',
     );
 
+  // Inspect each element once. Callback buckets preserve the existing order:
+  // direct components, component references, then definition wrappers.
   for (const path of elements) {
     const binding = elementBinding(path);
-    const icon = binding && icons.get(binding);
-    if (!binding || !icon || isDefinition(icon.pack)) {
-      continue;
-    }
     const opening = path.node.openingElement;
-    replace(
-      opening.name,
-      hasIconId(path)
-        ? componentName
-        : `${componentName} iconId="${icon.iconId}"`,
-    );
-    if (path.node.closingElement) {
-      replace(path.node.closingElement.name, componentName);
-    }
-    directElements.add(path.node);
-    recordIcon(binding, icon);
-  }
-
-  for (const path of elements) {
-    const binding = elementBinding(path);
-    if (directElements.has(path.node) || (binding && wrappers.has(binding))) {
+    const direct = binding && icons.get(binding);
+    if (binding && direct && !direct.definition) {
+      replace(
+        opening.name,
+        hasIconId(path) ? componentName : direct.openingReplacement,
+      );
+      if (path.node.closingElement) {
+        replace(path.node.closingElement.name, componentName);
+      }
+      usedImports.add(binding);
+      registrations[0].push(direct);
       continue;
     }
-    for (const attribute of path.node.openingElement.attributes) {
+    const wrapper = binding && wrappers.get(binding);
+    if (binding && wrapper) {
+      const attribute = opening.attributes.find(
+        (attr) =>
+          attr.type === 'JSXAttribute' &&
+          attr.name.type === 'JSXIdentifier' &&
+          attr.name.name === 'icon',
+      );
+      if (
+        attribute?.type !== 'JSXAttribute' ||
+        attribute.value?.type !== 'JSXExpressionContainer' ||
+        attribute.value.expression.type !== 'Identifier'
+      ) {
+        continue;
+      }
+      const iconBinding = getBinding(
+        path.scope,
+        attribute.value.expression.name,
+      );
+      const icon = iconBinding && icons.get(iconBinding);
+      if (
+        !iconBinding ||
+        !icon?.definition ||
+        (wrapper === '@hugeicons/react') !== icon.pack.startsWith('@hugeicons/')
+      ) {
+        continue;
+      }
+      replace(
+        opening.name,
+        hasIconId(path) ? componentName : icon.openingReplacement,
+      );
+      if (path.node.closingElement) {
+        replace(path.node.closingElement.name, componentName);
+      }
+      let to = attribute.end;
+      while (/\s/.test(code[to] ?? '') && to < code.length) {
+        to++;
+      }
+      edits.push({ type: 'remove', from: attribute.start, to });
+      replaced.add(attribute.value.expression);
+      usedImports.add(binding);
+      usedImports.add(iconBinding);
+      registrations[2].push(icon);
+      continue;
+    }
+    for (const attribute of opening.attributes) {
       if (
         attribute.type !== 'JSXAttribute' ||
         attribute.value?.type !== 'JSXExpressionContainer' ||
@@ -210,71 +308,20 @@ export const transformModule = (
         continue;
       }
       const expression = attribute.value.expression;
-      const iconBinding = path.scope.getBinding(expression.name);
+      const iconBinding = getBinding(path.scope, expression.name);
       const icon = iconBinding && icons.get(iconBinding);
-      if (!iconBinding || !icon || isDefinition(icon.pack)) {
+      if (!iconBinding || !icon || icon.definition) {
         continue;
       }
-      replace(
-        expression,
-        '(props) => <' +
-          componentName +
-          ' {...props} iconId="' +
-          icon.iconId +
-          '" />',
-      );
-      recordIcon(iconBinding, icon);
+      replace(expression, icon.referenceReplacement);
+      usedImports.add(iconBinding);
+      registrations[1].push(icon);
     }
   }
-
-  for (const path of elements) {
-    const binding = elementBinding(path);
-    const wrapper = binding && wrappers.get(binding);
-    if (!binding || !wrapper) {
-      continue;
+  for (const bucket of registrations) {
+    for (const icon of bucket) {
+      register(icon.pack, icon.exportName);
     }
-    const opening = path.node.openingElement;
-    const attribute = opening.attributes.find(
-      (attr) =>
-        attr.type === 'JSXAttribute' &&
-        attr.name.type === 'JSXIdentifier' &&
-        attr.name.name === 'icon',
-    );
-    if (
-      attribute?.type !== 'JSXAttribute' ||
-      attribute.value?.type !== 'JSXExpressionContainer' ||
-      attribute.value.expression.type !== 'Identifier'
-    ) {
-      continue;
-    }
-    const iconBinding = path.scope.getBinding(attribute.value.expression.name);
-    const icon = iconBinding && icons.get(iconBinding);
-    if (
-      !iconBinding ||
-      !icon ||
-      !isDefinition(icon.pack) ||
-      (wrapper === '@hugeicons/react') !== icon.pack.startsWith('@hugeicons/')
-    ) {
-      continue;
-    }
-    replace(
-      opening.name,
-      hasIconId(path)
-        ? componentName
-        : `${componentName} iconId="${icon.iconId}"`,
-    );
-    if (path.node.closingElement) {
-      replace(path.node.closingElement.name, componentName);
-    }
-    const [from, end] = range(attribute);
-    let to = end;
-    while (/\s/.test(code[to] ?? '') && to < code.length) {
-      to++;
-    }
-    edits.push({ type: 'remove', from, to });
-    replaced.push([from, to]);
-    usedImports.add(binding);
-    recordIcon(iconBinding, icon);
   }
   if (!edits.length) {
     return unchanged;
@@ -283,14 +330,11 @@ export const transformModule = (
   for (const path of imports) {
     const declaration = path.node;
     const kept = declaration.specifiers.filter((specifier) => {
-      const binding = path.scope.getBinding(specifier.local.name);
+      const binding = getBinding(path.scope, specifier.local.name);
       return (
         !binding ||
         !usedImports.has(binding) ||
-        binding.referencePaths.some((reference) => {
-          const [start, end] = range(reference.node);
-          return !replaced.some(([from, to]) => start >= from && end <= to);
-        })
+        binding.references.some((reference) => !replaced.has(reference))
       );
     });
     if (kept.length === declaration.specifiers.length) {
@@ -331,7 +375,13 @@ export const transformModule = (
         ? ICON_COMPONENT_NAME
         : `${ICON_COMPONENT_NAME} as ${componentName}`;
     const pos =
-      ast.program.directives.at(-1)?.end ?? ast.program.interpreter?.end ?? 0;
+      ast.body
+        .filter(
+          (node) => node.type === 'ExpressionStatement' && 'directive' in node,
+        )
+        .at(-1)?.end ??
+      ast.hashbang?.end ??
+      0;
     edits.push({
       type: 'insert',
       pos,
