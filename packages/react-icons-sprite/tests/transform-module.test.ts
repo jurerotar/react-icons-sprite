@@ -359,10 +359,42 @@ describe('transformModule', () => {
     expect(result.anyReplacements).toBe(true);
     expect(result.code).toContain('iconId="ri-lucide-react-Circle"');
     expect(result.code).not.toContain('Ring');
+    expect(used).toEqual([{ pack: 'lucide-react', exportName: 'Circle' }]);
+  });
+
+  test('deduplicates aliases and reference props while preserving registration phase order', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `
+      import { Circle, Circle as Ring, Square } from "lucide-react";
+      import { Circle as FeatherCircle } from "react-feather";
+      export const A = () => <Button icon={Square}><Ring /><Circle /><FeatherCircle /><Button icon={Circle} /></Button>;
+    `;
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push({ pack, exportName });
+    });
+
+    expect(result.anyReplacements).toBe(true);
+    expect(result.code.match(/iconId=/g)).toHaveLength(5);
     expect(used).toEqual([
       { pack: 'lucide-react', exportName: 'Circle' },
-      { pack: 'lucide-react', exportName: 'Circle' },
+      { pack: 'react-feather', exportName: 'Circle' },
+      { pack: 'lucide-react', exportName: 'Square' },
     ]);
+  });
+
+  test('retains a live alias when another alias of the same icon is transformed', () => {
+    const used: string[] = [];
+    const input = `import { Circle, Circle as Ring } from "lucide-react";
+      export const inline = Circle;
+      export const A = () => <Ring />;`;
+    const result = transformModule(input, 'file.tsx', (pack, exportName) => {
+      used.push(`${pack}:${exportName}`);
+    });
+    expect(result.code).toContain('import { Circle } from "lucide-react"');
+    expect(result.code).toContain('export const inline = Circle;');
+    expect(result.code).not.toContain('Circle as Ring');
+    expect(result.code).toContain('iconId="ri-lucide-react-Circle"');
+    expect(used).toEqual(['lucide-react:Circle']);
   });
 
   test('does not add a duplicate iconId prop', () => {
@@ -639,6 +671,25 @@ describe('transformModule', () => {
     expect(result.code).toContain('iconId="ri-icons-CustomSearch"');
     expect(result.code).not.toContain('from "@/icons"');
     expect(used).toEqual([{ pack: '@/icons', exportName: 'CustomSearch' }]);
+  });
+
+  test('leaves excluded icon sources inline so their child SVG elements remain styleable', () => {
+    const used: Array<{ pack: string; exportName: string }> = [];
+    const input = `import { PillageFirstHorse } from "@pillage-first/graphics";\nexport const A = () => <PillageFirstHorse className="horse" />;`;
+
+    const result = transformModule(
+      input,
+      'file.tsx',
+      (pack, exportName) => {
+        used.push({ pack, exportName });
+      },
+      undefined,
+      { excludedSources: [/^@pillage-first\/graphics$/] },
+    );
+
+    expect(result.anyReplacements).toBe(false);
+    expect(result.code).toBe(input);
+    expect(used).toEqual([]);
   });
 
   test('rewrites Pillage First graphics icons by default', () => {

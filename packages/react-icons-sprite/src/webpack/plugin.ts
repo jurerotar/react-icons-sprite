@@ -8,8 +8,10 @@ import {
 } from '../plugin-options';
 import type { Compiler, Compilation } from 'webpack';
 
-export type ReactIconsSpriteWebpackPluginOptions =
-  ReactIconsSpritePluginOptions;
+export type ReactIconsSpriteWebpackPluginOptions = Pick<
+  ReactIconsSpritePluginOptions,
+  'outputDir'
+>;
 
 export class ReactIconsSpriteWebpackPlugin {
   private readonly outputDir?: string;

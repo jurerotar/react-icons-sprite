@@ -1,9 +1,21 @@
 import { transformModule } from '../transform/transform-module';
 import { collector } from '../collector';
-import { createIconSources } from '../plugin-options';
+import {
+  createExcludedIconSources,
+  createIconSources,
+  type ReactIconsSpritePluginOptions,
+} from '../plugin-options';
 import type { LoaderDefinitionFunction } from 'webpack';
 
-const reactIconsSpriteLoader: LoaderDefinitionFunction = async function (
+export type ReactIconsSpriteWebpackLoaderOptions = Pick<
+  ReactIconsSpritePluginOptions,
+  'exclude'
+>;
+
+type SpriteLoader =
+  LoaderDefinitionFunction<ReactIconsSpriteWebpackLoaderOptions>;
+
+const reactIconsSpriteLoader: SpriteLoader = async function (
   this,
   source,
 ): Promise<string> {
@@ -19,6 +31,8 @@ const reactIconsSpriteLoader: LoaderDefinitionFunction = async function (
     }
 
     const iconSources = createIconSources();
+    const { exclude } = this.getOptions();
+    const excludedIconSources = createExcludedIconSources(exclude);
 
     const { code, anyReplacements } = transformModule(
       String(source),
@@ -27,6 +41,7 @@ const reactIconsSpriteLoader: LoaderDefinitionFunction = async function (
         collector.add(pack, exportName, { importer: id });
       },
       iconSources,
+      { excludedSources: excludedIconSources },
     );
 
     if (!anyReplacements) {
