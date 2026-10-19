@@ -1,15 +1,17 @@
 import { createHash } from 'node:crypto';
-import { buildSprite } from '../sprite/build-sprite';
-import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
+import type { Compilation, Compiler } from 'webpack';
 import { collector } from '../collector';
+import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 import {
   createSpriteAssetName,
   type ReactIconsSpritePluginOptions,
 } from '../plugin-options';
-import type { Compiler, Compilation } from 'webpack';
+import { buildSprite } from '../sprite/build-sprite';
 
-export type ReactIconsSpriteWebpackPluginOptions =
-  ReactIconsSpritePluginOptions;
+export type ReactIconsSpriteWebpackPluginOptions = Pick<
+  ReactIconsSpritePluginOptions,
+  'outputDir'
+>;
 
 export class ReactIconsSpriteWebpackPlugin {
   private readonly outputDir?: string;
@@ -65,17 +67,16 @@ export class ReactIconsSpriteWebpackPlugin {
 
             // Compute public URL
             const outputPublicPath = compilation.outputOptions?.publicPath;
-            let base = '';
-            if (
-              typeof outputPublicPath === 'string' &&
-              outputPublicPath !== 'auto'
-            ) {
-              base = outputPublicPath.endsWith('/')
-                ? outputPublicPath
-                : `${outputPublicPath}/`;
-            } else {
-              base = '/';
-            }
+            const publicPath =
+              outputPublicPath === undefined || outputPublicPath === 'auto'
+                ? '/'
+                : compilation.getPath(outputPublicPath, {
+                    hash: compilation.hash,
+                  });
+            const base =
+              publicPath === '' || publicPath.endsWith('/')
+                ? publicPath
+                : `${publicPath}/`;
             const finalUrl = `${base}${name}`;
 
             // Replace placeholder in all JS chunks
