@@ -197,10 +197,11 @@ placeholder URL.
 ```js
 // webpack.config.js (v5)
 const path = require('path');
-const { reactIconsSprite } = require('react-icons-sprite/webpack');
+const { ReactIconsSpriteWebpackPlugin } = require('react-icons-sprite/webpack');
 
 module.exports = {
   mode: 'production',
+  // optional: output: { publicPath: '/admin/panel/' },
   // ... your existing config
   module: {
     rules: [
@@ -218,7 +219,7 @@ module.exports = {
     ],
   },
   plugins: [
-    reactIconsSprite({
+    new ReactIconsSpriteWebpackPlugin({
       // optional: outputDir: 'assets/sprites',
     }),
   ],
@@ -245,6 +246,7 @@ import { ReactIconsSpriteWebpackPlugin } from 'react-icons-sprite/webpack';
 
 export default defineConfig({
   plugins: [pluginReact()],
+  // optional: output: { assetPrefix: '/admin/panel/' },
   tools: {
     rspack: (config, { env }) => {
       if (env === 'production') {

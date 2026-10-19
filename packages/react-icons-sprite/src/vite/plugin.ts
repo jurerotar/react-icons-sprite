@@ -1,6 +1,7 @@
-import type { Plugin } from 'vite';
 import { createHash } from 'node:crypto';
+import type { Plugin } from 'vite';
 import { createCollector } from '../collector/create-collector';
+import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 import {
   createExcludedIconSources,
   createIconSources,
@@ -9,7 +10,6 @@ import {
 } from '../plugin-options';
 import { buildSprite } from '../sprite/build-sprite';
 import { transformModule } from '../transform/transform-module';
-import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
 
 export type ReactIconsSpriteVitePluginOptions = ReactIconsSpritePluginOptions;
 
@@ -22,6 +22,7 @@ export const reactIconsSprite = (
 
   const collector = createCollector();
   let root = process.cwd();
+  let base = '/';
 
   return {
     name: 'vite-plugin-react-icons-sprite',
@@ -34,6 +35,7 @@ export const reactIconsSprite = (
 
     configResolved(config) {
       root = config.root;
+      base = config.base;
     },
 
     async transform(code, id) {
@@ -96,7 +98,7 @@ export const reactIconsSprite = (
       const assetId = this.emitFile(emitFileOptions);
       const name = this.getFileName(assetId);
 
-      const finalUrl = `/${name}`;
+      const finalUrl = `${base}${name}`;
 
       for (const [, item] of Object.entries(bundle)) {
         if (item.type === 'chunk' && typeof item.code === 'string') {
