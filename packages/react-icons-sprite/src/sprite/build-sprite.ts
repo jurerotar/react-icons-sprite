@@ -1,6 +1,6 @@
 import type { CollectedIcon } from '../collector/create-collector';
 import { computeIconId } from '../utils/compute-icon-id';
-import { renderIcon } from './render-icon';
+import { createIconRenderer } from './render-icon';
 
 type BuildSpriteOptions = {
   baseDir?: string;
@@ -14,6 +14,7 @@ export const buildSprite = async (
     return '<svg xmlns="http://www.w3.org/2000/svg" style="display:none"></svg>';
   }
 
+  const renderIcon = createIconRenderer();
   const symbols = await Promise.all(
     icons.map(async ({ pack, exportName, importer, importPath }) => {
       const rendered = await renderIcon(pack, exportName, {

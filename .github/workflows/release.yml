@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}
   cancel-in-progress: false
 
 defaults:
@@ -24,6 +24,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup environment (node + install)
         uses: ./.github/actions/node-setup
@@ -57,7 +58,42 @@ jobs:
           echo "Publishing react-icons-sprite@$version with npm dist-tag '$tag'"
           echo "GitHub release tag: $version"
 
+      - name: Check release tag before publishing
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.release-tag }}
+        run: |
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            existing_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+            if [ "$existing_sha" != "$GITHUB_SHA" ]; then
+              echo "Tag '$RELEASE_TAG' already exists at $existing_sha, expected $GITHUB_SHA" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Check existing npm publication
+        id: publication
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          const { RELEASE_VERSION, GITHUB_SHA, GITHUB_OUTPUT } = process.env;
+          const response = await fetch(`https://registry.npmjs.org/react-icons-sprite/${encodeURIComponent(RELEASE_VERSION)}`);
+          if (response.status === 404) {
+            appendFileSync(GITHUB_OUTPUT, 'published=false\n');
+          } else {
+            if (!response.ok) throw new Error(`npm registry returned HTTP ${response.status}`);
+            const metadata = await response.json();
+            if (metadata.gitHead !== GITHUB_SHA) {
+              throw new Error(`react-icons-sprite@${RELEASE_VERSION} was published from ${metadata.gitHead ?? 'an unknown commit'}, expected ${GITHUB_SHA}`);
+            }
+            appendFileSync(GITHUB_OUTPUT, 'published=true\n');
+            console.log(`react-icons-sprite@${RELEASE_VERSION} is already published from this commit; resuming GitHub release`);
+          }
+          NODE
+
       - name: Publish package with provenance
+        if: steps.publication.outputs.published != 'true'
         env:
           NPM_DIST_TAG: ${{ steps.release.outputs.npm-tag }}
         run: npm publish --workspace react-icons-sprite --access public --tag "$NPM_DIST_TAG"
@@ -67,14 +103,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.release-tag }}
         run: |
-          existing_sha="$(
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              "/repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
-              --jq '.object.sha' 2>/dev/null || true
-          )"
-
-          if [ -n "$existing_sha" ]; then
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            existing_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
             if [ "$existing_sha" != "$GITHUB_SHA" ]; then
               echo "Tag '$RELEASE_TAG' already exists at $existing_sha, expected $GITHUB_SHA" >&2
               exit 1
@@ -101,20 +131,21 @@ jobs:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
           RELEASE_PRERELEASE: ${{ steps.release.outputs.prerelease }}
         run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "GitHub release '$RELEASE_TAG' already exists"
             exit 0
           fi
 
           release_args=(
             "$RELEASE_TAG"
+            --repo "$GITHUB_REPOSITORY"
             --verify-tag
             --title "react-icons-sprite@${RELEASE_VERSION}"
             --generate-notes
           )
 
           if [ "$RELEASE_PRERELEASE" = "true" ]; then
-            release_args+=(--prerelease)
+            release_args+=(--prerelease --latest=false)
           fi
 
           gh release create "${release_args[@]}"

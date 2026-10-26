@@ -75,6 +75,21 @@ describe('isHugeiconsIconDefinition', () => {
 });
 
 describe('renderIcon', () => {
+  test.each([
+    'Settings2',
+    'Maximize2',
+    'Minimize2',
+    'Settings2Icon',
+    'LucideSettings2',
+    'AlarmCheck',
+  ])('renders Lucide %s using the installed version', async (exportName) => {
+    const rendered = await renderIcon('lucide-react', exportName, {
+      baseDir: process.cwd(),
+    });
+    expect(rendered.viewBox).toBe('0 0 24 24');
+    expect(rendered.symbolBody).toMatch(/<(path|line|circle)\b/);
+  });
+
   test('unwraps nested CommonJS default icon exports', async () => {
     const rendered = await renderIcon('@ant-design/icons', 'AlertOutlined', {
       baseDir: process.cwd(),
