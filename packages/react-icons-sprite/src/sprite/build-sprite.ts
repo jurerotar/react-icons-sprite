@@ -4,6 +4,7 @@ import { createIconRenderer } from './render-icon';
 
 type BuildSpriteOptions = {
   baseDir?: string;
+  renderIcon?: ReturnType<typeof createIconRenderer>;
 };
 
 export const buildSprite = async (
@@ -14,7 +15,8 @@ export const buildSprite = async (
     return '<svg xmlns="http://www.w3.org/2000/svg" style="display:none"></svg>';
   }
 
-  const renderIcon = createIconRenderer();
+  const renderIcon = options.renderIcon ?? createIconRenderer();
+
   const symbols = await Promise.all(
     icons.map(async ({ pack, exportName, importer, importPath }) => {
       const rendered = await renderIcon(pack, exportName, {

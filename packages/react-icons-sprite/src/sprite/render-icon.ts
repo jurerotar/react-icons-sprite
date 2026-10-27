@@ -1,13 +1,15 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createElement, type ComponentType } from 'react';
+import { type ComponentType, createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   hasVersionedIconResolver,
-  selectIconImportResolver,
   type ImportResolver,
+  selectIconImportResolver,
 } from '../packs/icon-resolvers';
+import { createModuleParser } from '../transform/parse-module';
+import { createStaticIconLoader } from './static-icon-loader';
 
 export type RenderedIcon = {
   symbolBody: string;
@@ -49,6 +51,52 @@ type PackageInfo = {
 type ResolutionCache = {
   roots: Map<string, string | null>;
   packages: Map<string, PackageInfo>;
+  reexports: Map<string, Map<string, string>>;
+  loadStatic: ReturnType<typeof createStaticIconLoader>;
+};
+
+const resolveLucideAlias = (
+  entryFile: string,
+  exportName: string,
+  cache: ResolutionCache,
+): string | null => {
+  let reexports = cache.reexports.get(entryFile);
+  if (!reexports) {
+    reexports = new Map();
+    cache.reexports.set(entryFile, reexports);
+    try {
+      const program = createModuleParser()(
+        entryFile,
+        readFileSync(entryFile, 'utf8'),
+      );
+      for (const node of program?.body ?? []) {
+        if (
+          node.type !== 'ExportNamedDeclaration' ||
+          !node.source?.value.startsWith('.')
+        ) {
+          continue;
+        }
+        for (const specifier of node.specifiers) {
+          if (
+            specifier.local.type === 'Identifier' &&
+            specifier.local.name === 'default'
+          ) {
+            const name =
+              specifier.exported.type === 'Identifier'
+                ? specifier.exported.name
+                : specifier.exported.value;
+            reexports.set(name, node.source.value);
+          }
+        }
+      }
+    } catch {
+      // Unrecognized layouts still use the library entry module.
+    }
+  }
+  const target = reexports.get(exportName);
+  return target
+    ? resolveFileCandidate(path.resolve(path.dirname(entryFile), target))
+    : null;
 };
 
 const readPackageInfo = (
@@ -95,22 +143,30 @@ const findPackageRoot = (
   cache: ResolutionCache,
 ): string | null => {
   let current = path.resolve(baseDir);
-  const key = JSON.stringify([packageName, current]);
-  const cachedRoot = cache.roots.get(key);
-  if (cachedRoot !== undefined) {
-    return cachedRoot;
-  }
+  const visited: string[] = [];
+
+  const remember = (root: string | null) => {
+    for (const key of visited) {
+      cache.roots.set(key, root);
+    }
+    return root;
+  };
+
   while (true) {
+    const key = JSON.stringify([packageName, current]);
+    const cachedRoot = cache.roots.get(key);
+    if (cachedRoot !== undefined) {
+      return remember(cachedRoot);
+    }
+    visited.push(key);
     const candidate = path.join(current, 'node_modules', packageName);
     if (existsSync(path.join(candidate, 'package.json'))) {
-      cache.roots.set(key, candidate);
-      return candidate;
+      return remember(candidate);
     }
 
     const parent = path.dirname(current);
     if (parent === current) {
-      cache.roots.set(key, null);
-      return null;
+      return remember(null);
     }
     current = parent;
   }
@@ -185,8 +241,10 @@ const fileExists = (filePath: string): boolean => {
 };
 
 const resolveFileCandidate = (filePath: string): string | null => {
+  if (fileExists(filePath)) {
+    return filePath;
+  }
   const candidates = [
-    filePath,
     `${filePath}.mjs`,
     `${filePath}.js`,
     `${filePath}.cjs`,
@@ -440,12 +498,14 @@ const renderHugeiconsIconDefinition = (
   };
 };
 
-const renderIconWithCache = async (
+type PreparedIcon = () => Promise<unknown>;
+
+const prepareIcon = async (
   pack: string,
   exportName: string,
   options: RenderIconOptions,
   cache: ResolutionCache,
-): Promise<RenderedIcon> => {
+): Promise<PreparedIcon> => {
   let packageRoot: string | null = null;
   let packageInfo: PackageInfo | undefined;
   const packageName = parsePackageSpecifier(pack)?.packageName ?? pack;
@@ -465,16 +525,24 @@ const renderIconWithCache = async (
   const importPath =
     options.importPath ?? packageInfo?.resolveImport(pack, exportName) ?? pack;
   let specifier = importPath;
+  let resolvedPath: string | null = null;
+  let resolvedExportName = exportName;
   if (packageRoot && packageInfo) {
     const subpath = parsePackageSpecifier(importPath)?.subpath ?? '.';
+    resolvedPath = resolveFromPackageRoot(
+      packageRoot,
+      subpath,
+      packageInfo.manifest,
+    );
     specifier =
-      resolveFromPackageRoot(packageRoot, subpath, packageInfo.manifest) ??
+      resolvedPath ??
       path.join(packageRoot, subpath === '.' ? 'index.js' : subpath);
   }
   if (
     pack === 'lucide-react' &&
     packageRoot &&
     importPath.startsWith(`${pack}/`) &&
+    !resolvedPath &&
     !fileExists(specifier)
   ) {
     // Renamed icons and unusual spellings are still exported by the entry module.
@@ -482,22 +550,49 @@ const renderIconWithCache = async (
       packageRoot,
       `dist/esm/lucide-react${path.extname(specifier)}`,
     );
+    resolvedPath = resolveLucideAlias(specifier, exportName, cache);
+    if (resolvedPath) {
+      resolvedExportName = 'default';
+    }
   }
-  const imported = (await import(
-    resolveImportSpecifier(specifier, options, cache)
-  )) as Record<string, unknown>;
-  const iconComponent = unwrapNestedDefaultExport(
-    pickExport(
-      imported,
-      exportName === 'default' &&
-        imported.default === undefined &&
-        packageRoot &&
-        importPath !== pack &&
-        pack !== packageName
-        ? (pack.split('/').at(-1) ?? exportName)
-        : exportName,
-    ),
-  );
+  const staticComponent =
+    resolvedPath && !options.importPath
+      ? await cache.loadStatic(
+          pack,
+          resolvedPath,
+          resolvedExportName,
+          packageInfo?.manifest.version,
+        )
+      : null;
+  return async () => {
+    const imported = staticComponent
+      ? { default: staticComponent, [resolvedExportName]: staticComponent }
+      : ((await import(
+          resolvedPath
+            ? pathToFileURL(resolvedPath).href
+            : resolveImportSpecifier(specifier, options, cache)
+        )) as Record<string, unknown>);
+    return unwrapNestedDefaultExport(
+      pickExport(
+        imported,
+        resolvedExportName === 'default' &&
+          imported.default === undefined &&
+          packageRoot &&
+          importPath !== pack &&
+          pack !== packageName
+          ? (pack.split('/').at(-1) ?? resolvedExportName)
+          : resolvedExportName,
+      ),
+    );
+  };
+};
+
+const renderPreparedIcon = async (
+  pack: string,
+  exportName: string,
+  prepared: Promise<PreparedIcon>,
+): Promise<RenderedIcon> => {
+  const iconComponent = await (await prepared)();
 
   if (isFontAwesomeIconDefinition(iconComponent)) {
     return renderFontAwesomeIconDefinition(iconComponent);
@@ -537,9 +632,55 @@ const renderIconWithCache = async (
 
 // Share resolution work within a sprite build; each new build starts fresh.
 export const createIconRenderer = () => {
-  const cache: ResolutionCache = { roots: new Map(), packages: new Map() };
-  return (pack: string, exportName: string, options: RenderIconOptions = {}) =>
-    renderIconWithCache(pack, exportName, options, cache);
+  const cache: ResolutionCache = {
+    roots: new Map(),
+    packages: new Map(),
+    reexports: new Map(),
+    loadStatic: createStaticIconLoader(),
+  };
+  const prepared = new Map<string, Promise<PreparedIcon>>();
+  const prepare = (
+    pack: string,
+    exportName: string,
+    options: RenderIconOptions,
+  ) => {
+    const key = JSON.stringify([
+      pack,
+      exportName,
+      options.baseDir,
+      options.importer,
+      options.importPath,
+    ]);
+    let pending = prepared.get(key);
+    if (!pending) {
+      pending = prepareIcon(pack, exportName, options, cache);
+      // Prefetch failures are reported when the collected icon is rendered.
+      void pending.catch(() => {});
+      prepared.set(key, pending);
+    }
+    return pending;
+  };
+  const render = (
+    pack: string,
+    exportName: string,
+    options: RenderIconOptions = {},
+  ) => renderPreparedIcon(pack, exportName, prepare(pack, exportName, options));
+  const preload = (
+    pack: string,
+    exportName: string,
+    options: RenderIconOptions = {},
+  ): Promise<void> => {
+    if (
+      options.importPath ||
+      (pack !== 'lucide-react' && !/^react-icons\/[\w-]+$/.test(pack))
+    ) {
+      return Promise.resolve();
+    }
+    const pending = prepare(pack, exportName, options).then(() => {});
+    void pending.catch(() => {});
+    return pending;
+  };
+  return Object.assign(render, { preload });
 };
 
 export const renderIcon = (

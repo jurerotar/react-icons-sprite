@@ -9,6 +9,7 @@ import {
   type ReactIconsSpritePluginOptions,
 } from '../plugin-options';
 import { buildSprite } from '../sprite/build-sprite';
+import { createIconRenderer } from '../sprite/render-icon';
 import { transformModule } from '../transform/transform-module';
 
 export type ReactIconsSpriteVitePluginOptions = ReactIconsSpritePluginOptions;
@@ -23,6 +24,7 @@ export const reactIconsSprite = (
   const collector = createCollector();
   let root = process.cwd();
   let base = '/';
+  let renderIcon = createIconRenderer();
 
   return {
     name: 'vite-plugin-react-icons-sprite',
@@ -31,6 +33,7 @@ export const reactIconsSprite = (
 
     buildStart() {
       collector.clear();
+      renderIcon = createIconRenderer();
     },
 
     configResolved(config) {
@@ -56,6 +59,11 @@ export const reactIconsSprite = (
             collector.add(pack, exportName, {
               importer: cleanId,
             });
+
+            void renderIcon.preload(pack, exportName, {
+              baseDir: root,
+              importer: cleanId,
+            });
           },
           iconSources,
           { excludedSources: excludedIconSources },
@@ -77,6 +85,7 @@ export const reactIconsSprite = (
     async generateBundle(this, _options, bundle) {
       const spriteXml = await buildSprite(collector.toList(), {
         baseDir: root,
+        renderIcon,
       });
 
       const generatedHash = createHash('sha256')
