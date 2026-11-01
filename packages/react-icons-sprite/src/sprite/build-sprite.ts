@@ -12,7 +12,7 @@ export const buildSprite = async (
   options: BuildSpriteOptions = {},
 ): Promise<string> => {
   if (!icons.length) {
-    return '<svg xmlns="http://www.w3.org/2000/svg" style="display:none"></svg>';
+    return '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
   }
 
   const renderIcon = options.renderIcon ?? createIconRenderer();
@@ -33,5 +33,22 @@ export const buildSprite = async (
     }),
   );
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" style="display:none">${symbols.join('')}</svg>`;
+  const gradients: string[] = [];
+  // Work on serialized SVG after rendering, preserving each gradient's IDs
+  // and references (including href references between gradients).
+  const body = symbols
+    .join('')
+    .replace(
+      /<(linearGradient|radialGradient)\b[^>]*(?:\/>|>[\s\S]*?<\/\1>)/gu,
+      (gradient) => {
+        gradients.push(gradient);
+        return '';
+      },
+    );
+  const defs = gradients.length ? `<defs>${gradients.join('')}</defs>` : '';
+
+  // Firefox cannot paint gradients inside externally referenced symbols.
+  // Hoist them outside the symbols and keep their ancestors displayable.
+  // Symbols themselves do not render until referenced by <use>.
+  return `<svg xmlns="http://www.w3.org/2000/svg">${defs}${body}</svg>`;
 };

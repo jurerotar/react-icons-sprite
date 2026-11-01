@@ -1,12 +1,9 @@
-import { createHash } from 'node:crypto';
 import type { Compilation, Compiler } from 'webpack';
 import { collector } from '../collector';
 import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
-import {
-  createSpriteAssetName,
-  type ReactIconsSpritePluginOptions,
-} from '../plugin-options';
+import type { ReactIconsSpritePluginOptions } from '../plugin-options';
 import { buildSprite } from '../sprite/build-sprite';
+import { createSpriteAsset } from '../sprite/create-sprite-asset';
 
 export type ReactIconsSpriteWebpackPluginOptions = Pick<
   ReactIconsSpritePluginOptions,
@@ -45,13 +42,8 @@ export class ReactIconsSpriteWebpackPlugin {
               baseDir: compiler.context,
             });
 
-            const generatedHash = createHash('sha256')
-              .update(spriteXml)
-              .digest('hex')
-              .slice(0, 8);
-
-            const name = createSpriteAssetName(
-              `react-icons-sprite-${generatedHash}.svg`,
+            const { fileName, source } = createSpriteAsset(
+              spriteXml,
               this.outputDir,
             );
 
@@ -62,8 +54,7 @@ export class ReactIconsSpriteWebpackPlugin {
               );
             }
 
-            // Emit asset
-            compilation.emitAsset(name, new RawSource(spriteXml));
+            compilation.emitAsset(fileName, new RawSource(source));
 
             // Compute public URL
             const outputPublicPath = compilation.outputOptions?.publicPath;
@@ -77,11 +68,11 @@ export class ReactIconsSpriteWebpackPlugin {
               publicPath === '' || publicPath.endsWith('/')
                 ? publicPath
                 : `${publicPath}/`;
-            const finalUrl = `${base}${name}`;
+            const finalUrl = `${base}${fileName}`;
 
             // Replace placeholder in all JS chunks
             for (const asset of compilation.getAssets()) {
-              const filename: string = asset.name;
+              const filename = asset.name;
               if (!/\.(js|mjs|cjs)$/i.test(filename)) {
                 continue;
               }

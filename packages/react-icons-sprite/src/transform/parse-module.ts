@@ -1,8 +1,8 @@
 import {
-  parseSync,
-  rawTransferSupported,
   type ParserOptions,
   type Program,
+  parseSync,
+  rawTransferSupported,
 } from 'oxc-parser';
 
 export const createModuleParser = (preferRawTransfer = true) => {

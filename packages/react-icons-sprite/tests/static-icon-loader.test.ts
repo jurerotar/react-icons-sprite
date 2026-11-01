@@ -135,11 +135,14 @@ test('bounds concurrent reads and drains queued work after a read fails', async 
     expect(releases).toHaveLength(32);
     releases.shift()?.(true);
     await vi.waitFor(() => expect(releases).toHaveLength(32));
-    while (releases.length) {
-      for (const release of releases.splice(0)) {
+    let completed = 1;
+    while (completed < pending.length) {
+      await vi.waitFor(() => expect(releases.length).toBeGreaterThan(0));
+      const batch = releases.splice(0);
+      completed += batch.length;
+      for (const release of batch) {
         release();
       }
-      await Promise.resolve();
     }
     expect(await Promise.all(pending)).toEqual(Array(70).fill(null));
   } finally {

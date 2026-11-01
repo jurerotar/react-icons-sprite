@@ -1,17 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
   createExcludedIconSources,
-  createIconSources,
   createSpriteAssetName,
 } from '../src/plugin-options';
 
 describe('plugin options', () => {
-  test('uses the built-in icon import sources', () => {
-    const sources = createIconSources();
-
-    expect(sources.some((source) => source.test('lucide-react'))).toBe(true);
-  });
-
   test('normalizes one or many excluded icon sources', () => {
     const source = /^@pillage-first\/graphics$/;
 

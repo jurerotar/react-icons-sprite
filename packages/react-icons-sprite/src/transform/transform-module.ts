@@ -1,19 +1,21 @@
-import type { Program, ImportDeclaration, JSXElement, Node } from 'oxc-parser';
 import type { SourceMap } from 'magic-string';
+import type { ImportDeclaration, JSXElement, Node, Program } from 'oxc-parser';
 import { DEFAULT_ICON_SOURCES } from '../packs/icon-sources';
 import { normalizePackAlias } from '../utils/compute-icon-id';
-import { applyEdits, applyEditsToString } from './edit-applier';
-import type { EditOperation } from './edit-builder';
-import { fastFilter } from './fast-filter';
-import { createModuleParser } from './parse-module';
 import {
   analyzeModule,
-  getBinding as lookupBinding,
   type Binding,
+  getBinding,
   type ScopedNode,
 } from './analyze-module';
+import {
+  applyEdits,
+  applyEditsToString,
+  type EditOperation,
+} from './edit-applier';
+import { fastFilter } from './fast-filter';
+import { createModuleParser } from './parse-module';
 
-const getBinding = lookupBinding;
 const parseModule = createModuleParser();
 
 export const ICON_SOURCE = 'react-icons-sprite';
@@ -240,13 +242,19 @@ export const transformModule = (
       ? getBinding(path.scope, name.name)
       : undefined;
   };
-  const hasIconId = (path: ScopedNode<JSXElement>) =>
-    path.node.openingElement.attributes.some(
+  const replaceElement = (path: ScopedNode<JSXElement>, icon: IconSymbol) => {
+    const opening = path.node.openingElement;
+    const hasIconId = opening.attributes.some(
       (attr) =>
         attr.type === 'JSXAttribute' &&
         attr.name.type === 'JSXIdentifier' &&
         attr.name.name === 'iconId',
     );
+    replace(opening.name, hasIconId ? componentName : openingReplacement(icon));
+    if (path.node.closingElement) {
+      replace(path.node.closingElement.name, componentName);
+    }
+  };
 
   // Inspect each element once. Callback buckets preserve the existing order:
   // direct components, component references, then definition wrappers.
@@ -255,13 +263,7 @@ export const transformModule = (
     const opening = path.node.openingElement;
     const direct = binding && icons.get(binding);
     if (binding && direct && !direct.definition) {
-      replace(
-        opening.name,
-        hasIconId(path) ? componentName : openingReplacement(direct),
-      );
-      if (path.node.closingElement) {
-        replace(path.node.closingElement.name, componentName);
-      }
+      replaceElement(path, direct);
       usedImports.add(binding);
       registrations[0].push(direct);
       continue;
@@ -293,13 +295,7 @@ export const transformModule = (
       ) {
         continue;
       }
-      replace(
-        opening.name,
-        hasIconId(path) ? componentName : openingReplacement(icon),
-      );
-      if (path.node.closingElement) {
-        replace(path.node.closingElement.name, componentName);
-      }
+      replaceElement(path, icon);
       let to = attribute.end;
       while (/\s/.test(code[to] ?? '') && to < code.length) {
         to++;

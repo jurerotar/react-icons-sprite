@@ -10,8 +10,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, expect, test, vi } from 'vitest';
-import { createIconRenderer, renderIcon } from '../src/sprite/render-icon';
 import { buildSprite } from '../src/sprite/build-sprite';
+import { createIconRenderer, renderIcon } from '../src/sprite/render-icon';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();

@@ -1,14 +1,13 @@
-import { createHash } from 'node:crypto';
 import type { Plugin } from 'vite';
 import { createCollector } from '../collector/create-collector';
 import { REACT_ICONS_SPRITE_URL_PLACEHOLDER } from '../index';
+import { DEFAULT_ICON_SOURCES } from '../packs/icon-sources';
 import {
   createExcludedIconSources,
-  createIconSources,
-  createSpriteAssetName,
   type ReactIconsSpritePluginOptions,
 } from '../plugin-options';
 import { buildSprite } from '../sprite/build-sprite';
+import { createSpriteAsset } from '../sprite/create-sprite-asset';
 import { createIconRenderer } from '../sprite/render-icon';
 import { transformModule } from '../transform/transform-module';
 
@@ -18,7 +17,6 @@ export const reactIconsSprite = (
   options: ReactIconsSpriteVitePluginOptions = {},
 ): Plugin => {
   const { outputDir } = options;
-  const iconSources = createIconSources();
   const excludedIconSources = createExcludedIconSources(options.exclude);
 
   const collector = createCollector();
@@ -65,7 +63,7 @@ export const reactIconsSprite = (
               importer: cleanId,
             });
           },
-          iconSources,
+          DEFAULT_ICON_SOURCES,
           { excludedSources: excludedIconSources },
         );
         if (!anyReplacements) {
@@ -77,7 +75,7 @@ export const reactIconsSprite = (
         };
       } catch (error) {
         console.error(error);
-        // If parsing fails, skip transforming this module.
+        // Leave the module inline if transformation fails.
         return null;
       }
     },
@@ -88,35 +86,23 @@ export const reactIconsSprite = (
         renderIcon,
       });
 
-      const generatedHash = createHash('sha256')
-        .update(spriteXml)
-        .digest('hex')
-        .slice(0, 8);
-
-      const fileNameToEmit = createSpriteAssetName(
-        `react-icons-sprite-${generatedHash}.svg`,
-        outputDir,
-      );
-
-      const emitFileOptions: Parameters<typeof this.emitFile>[0] = {
+      const assetId = this.emitFile({
         type: 'asset',
-        source: spriteXml,
-        fileName: fileNameToEmit,
-      };
-
-      const assetId = this.emitFile(emitFileOptions);
+        ...createSpriteAsset(spriteXml, outputDir),
+      });
       const name = this.getFileName(assetId);
 
       const finalUrl = `${base}${name}`;
 
-      for (const [, item] of Object.entries(bundle)) {
-        if (item.type === 'chunk' && typeof item.code === 'string') {
-          if (item.code.includes(REACT_ICONS_SPRITE_URL_PLACEHOLDER)) {
-            item.code = item.code.replaceAll(
-              REACT_ICONS_SPRITE_URL_PLACEHOLDER,
-              finalUrl,
-            );
-          }
+      for (const item of Object.values(bundle)) {
+        if (
+          item.type === 'chunk' &&
+          item.code.includes(REACT_ICONS_SPRITE_URL_PLACEHOLDER)
+        ) {
+          item.code = item.code.replaceAll(
+            REACT_ICONS_SPRITE_URL_PLACEHOLDER,
+            finalUrl,
+          );
         }
       }
     },

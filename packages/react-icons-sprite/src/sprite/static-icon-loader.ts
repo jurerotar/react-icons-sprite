@@ -18,6 +18,29 @@ type Recipe = {
 };
 type Factory = (...args: StaticValue[]) => unknown;
 
+const createSourceReader = () => {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+  return async (file: string): Promise<string> => {
+    if (active < 32) {
+      active++;
+    } else {
+      await new Promise<void>((resolve) => waiting.push(resolve));
+    }
+    try {
+      return await readFile(file, 'utf8');
+    } finally {
+      const next = waiting.shift();
+      if (next) {
+        // Transfer the slot directly so a new request cannot overtake the queue.
+        next();
+      } else {
+        active--;
+      }
+    }
+  };
+};
+
 const literalValue = (node: Node): StaticValue => {
   if (
     node.type === 'Literal' &&
@@ -211,38 +234,7 @@ const readReactIconsPack = (source: string): Map<string, string> | null => {
 // the components with their real factories, and React still renders the SVG.
 // Cache lifetime is one sprite build; modified and unknown layouts use imports.
 export const createStaticIconLoader = () => {
-  let activeReads = 0;
-  const waiting = new Set<() => void>();
-  const readSource = (file: string): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const finished = () => {
-        activeReads--;
-        const next = waiting.values().next().value;
-        if (next) {
-          waiting.delete(next);
-          next();
-        }
-      };
-      const start = () => {
-        activeReads++;
-        void readFile(file, 'utf8').then(
-          (source) => {
-            finished();
-            resolve(source);
-          },
-          (error: unknown) => {
-            finished();
-            reject(error);
-          },
-        );
-      };
-      // Bound open files while allowing reads to overlap Vite's module work.
-      if (activeReads < 32) {
-        start();
-      } else {
-        waiting.add(start);
-      }
-    });
+  const readSource = createSourceReader();
   const packs = new Map<string, Promise<Map<string, string> | null>>();
   const recipes = new Map<string, Promise<Recipe | null>>();
   const factories = new Map<string, Promise<Record<string, unknown>>>();

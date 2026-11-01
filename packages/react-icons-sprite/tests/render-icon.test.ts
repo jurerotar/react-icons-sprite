@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { forwardRef } from 'react';
+import { describe, expect, test } from 'vitest';
 import {
   extractSymbolAttributes,
   isFontAwesomeIconDefinition,
