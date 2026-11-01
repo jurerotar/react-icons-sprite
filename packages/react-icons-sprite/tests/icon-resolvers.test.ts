@@ -1,5 +1,5 @@
-import satisfies from 'semver/functions/satisfies.js';
 import { readFileSync } from 'node:fs';
+import satisfies from 'semver/functions/satisfies.js';
 import { describe, expect, test } from 'vitest';
 import {
   hasVersionedIconResolver,

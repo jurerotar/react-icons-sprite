@@ -1,8 +1,6 @@
+import type { ImportDeclaration, JSXElement, Node, Program } from 'oxc-parser';
 import { visitorKeys as VISITOR_KEYS } from 'oxc-parser';
-import { isReferenced as referenceCheck } from './is-referenced';
-import type { Program, ImportDeclaration, JSXElement, Node } from 'oxc-parser';
-
-const isReferenced = referenceCheck;
+import { isReferenced } from './is-referenced';
 
 type Identifier = Extract<Node, { type: 'Identifier' }>;
 
@@ -113,35 +111,24 @@ export const analyzeModule = (ast: Program) => {
       }
       return;
     }
-    if (node.type === 'JSXElement') {
-      elements.push({ node, scope: inherited });
-      const opening = node.openingElement;
-      walk(opening.name, inherited, opening, node);
-      for (const attribute of opening.attributes) {
-        if (attribute.type === 'JSXSpreadAttribute') {
-          walk(attribute.argument, inherited, attribute, opening);
-        } else if (attribute.value?.type === 'JSXExpressionContainer') {
-          walk(
-            attribute.value.expression,
-            inherited,
-            attribute.value,
-            attribute,
-          );
+    if (node.type === 'JSXElement' || node.type === 'JSXFragment') {
+      if (node.type === 'JSXElement') {
+        elements.push({ node, scope: inherited });
+        const opening = node.openingElement;
+        walk(opening.name, inherited, opening, node);
+        for (const attribute of opening.attributes) {
+          if (attribute.type === 'JSXSpreadAttribute') {
+            walk(attribute.argument, inherited, attribute, opening);
+          } else if (attribute.value?.type === 'JSXExpressionContainer') {
+            walk(
+              attribute.value.expression,
+              inherited,
+              attribute.value,
+              attribute,
+            );
+          }
         }
       }
-      for (const child of node.children) {
-        if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
-          walk(child, inherited, node, parent);
-        } else if (
-          child.type === 'JSXExpressionContainer' ||
-          child.type === 'JSXSpreadChild'
-        ) {
-          walk(child.expression, inherited, child, node);
-        }
-      }
-      return;
-    }
-    if (node.type === 'JSXFragment') {
       for (const child of node.children) {
         if (child.type === 'JSXElement' || child.type === 'JSXFragment') {
           walk(child, inherited, node, parent);

@@ -1,11 +1,11 @@
-import { transformModule } from '../transform/transform-module';
+import type { LoaderDefinitionFunction } from 'webpack';
 import { collector } from '../collector';
+import { DEFAULT_ICON_SOURCES } from '../packs/icon-sources';
 import {
   createExcludedIconSources,
-  createIconSources,
   type ReactIconsSpritePluginOptions,
 } from '../plugin-options';
-import type { LoaderDefinitionFunction } from 'webpack';
+import { transformModule } from '../transform/transform-module';
 
 export type ReactIconsSpriteWebpackLoaderOptions = Pick<
   ReactIconsSpritePluginOptions,
@@ -30,7 +30,6 @@ const reactIconsSpriteLoader: SpriteLoader = async function (
       return source;
     }
 
-    const iconSources = createIconSources();
     const { exclude } = this.getOptions();
     const excludedIconSources = createExcludedIconSources(exclude);
 
@@ -40,7 +39,7 @@ const reactIconsSpriteLoader: SpriteLoader = async function (
       (pack, exportName) => {
         collector.add(pack, exportName, { importer: id });
       },
-      iconSources,
+      DEFAULT_ICON_SOURCES,
       { excludedSources: excludedIconSources },
     );
 

@@ -1,6 +1,6 @@
 import { parse } from '@babel/parser';
-import { expect, test } from 'vitest';
 import { transformWithOxc } from 'vite';
+import { expect, test } from 'vitest';
 import { transformModule } from '../src/transform/transform-module';
 
 const transform = (code: string) => {

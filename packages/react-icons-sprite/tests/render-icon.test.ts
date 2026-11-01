@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { forwardRef } from 'react';
+import { describe, expect, test } from 'vitest';
 import {
   extractSymbolAttributes,
   isFontAwesomeIconDefinition,
@@ -9,15 +9,16 @@ import {
   renderIcon,
 } from '../src/sprite/render-icon';
 
+const FunctionIcon = () => null;
+const ForwardRefIcon = forwardRef<SVGSVGElement>((_props, _ref) => null);
+
 describe('isRenderableComponent', () => {
   test('accepts function components', () => {
-    const Icon = () => null;
-    expect(isRenderableComponent(Icon)).toBe(true);
+    expect(isRenderableComponent(FunctionIcon)).toBe(true);
   });
 
   test('accepts forwardRef components', () => {
-    const Icon = forwardRef<SVGSVGElement>((_props, _ref) => null);
-    expect(isRenderableComponent(Icon)).toBe(true);
+    expect(isRenderableComponent(ForwardRefIcon)).toBe(true);
   });
 
   test('rejects non-component exports', () => {

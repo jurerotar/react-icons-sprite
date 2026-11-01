@@ -1,4 +1,4 @@
-import type { SVGProps, JSX } from 'react';
+import type { JSX, SVGProps } from 'react';
 
 export type IconProps = SVGProps<SVGSVGElement> & {
   iconId: string;

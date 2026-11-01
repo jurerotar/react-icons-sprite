@@ -1,6 +1,6 @@
-import { describe, expect, test, type BenchResult } from 'vitest';
-import { transformModule } from '../src/transform/transform-module';
+import { type BenchResult, describe, expect, test } from 'vitest';
 import { createCollector } from '../src/collector/create-collector';
+import { transformModule } from '../src/transform/transform-module';
 
 const report = (scenario: string, result: BenchResult) => {
   process.stdout.write(

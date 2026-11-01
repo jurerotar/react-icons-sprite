@@ -1,5 +1,3 @@
-import { DEFAULT_ICON_SOURCES } from './packs/icon-sources';
-
 export type IconSourceExclusion = RegExp | readonly RegExp[];
 
 export type ReactIconsSpritePluginOptions = {
@@ -18,10 +16,6 @@ export type ReactIconsSpritePluginOptions = {
 
 const normalizeOutputPathSegment = (value: string): string => {
   return value.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
-};
-
-export const createIconSources = (): readonly RegExp[] => {
-  return DEFAULT_ICON_SOURCES;
 };
 
 export const createExcludedIconSources = (

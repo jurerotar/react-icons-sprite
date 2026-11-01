@@ -1,5 +1,9 @@
 import MagicString from 'magic-string';
-import type { EditOperation } from './edit-builder';
+
+export type EditOperation =
+  | { type: 'replace'; from: number; to: number; value: string }
+  | { type: 'insert'; pos: number; value: string }
+  | { type: 'remove'; from: number; to: number };
 
 export const applyEdits = (
   code: string,
@@ -29,27 +33,24 @@ const editStart = (edit: EditOperation): number => {
 export const applyEditsToString = (
   code: string,
   edits: EditOperation[],
-  presorted = false,
 ): string => {
   if (!edits.length) {
     return code;
   }
 
-  const orderedEdits = presorted
-    ? edits
-    : [...edits].sort((left, right) => {
-        const startDelta = editStart(left) - editStart(right);
-        if (startDelta !== 0) {
-          return startDelta;
-        }
-        if (left.type === 'insert' && right.type !== 'insert') {
-          return 1;
-        }
-        if (left.type !== 'insert' && right.type === 'insert') {
-          return -1;
-        }
-        return 0;
-      });
+  const orderedEdits = [...edits].sort((left, right) => {
+    const startDelta = editStart(left) - editStart(right);
+    if (startDelta !== 0) {
+      return startDelta;
+    }
+    if (left.type === 'insert' && right.type !== 'insert') {
+      return 1;
+    }
+    if (left.type !== 'insert' && right.type === 'insert') {
+      return -1;
+    }
+    return 0;
+  });
 
   let result = '';
   let cursor = 0;

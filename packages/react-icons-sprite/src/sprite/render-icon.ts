@@ -1,13 +1,6 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { createElement, type ComponentType } from 'react';
+import { type ComponentType, createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import {
-  hasVersionedIconResolver,
-  selectIconImportResolver,
-  type ImportResolver,
-} from '../packs/icon-resolvers';
+import { createIconLoader, type IconLoadOptions } from './load-icon';
 
 export type RenderedIcon = {
   symbolBody: string;
@@ -28,253 +21,6 @@ const OMITTED_SVG_ATTRIBUTES = new Set([
   'id',
 ]);
 
-type PackageJson = {
-  version?: string;
-  exports?: unknown;
-  module?: string;
-  main?: string;
-};
-
-type RenderIconOptions = {
-  baseDir?: string;
-  importer?: string;
-  importPath?: string;
-};
-
-type PackageInfo = {
-  manifest: PackageJson;
-  resolveImport: ImportResolver;
-};
-
-type ResolutionCache = {
-  roots: Map<string, string | null>;
-  packages: Map<string, PackageInfo>;
-};
-
-const readPackageInfo = (
-  packageRoot: string,
-  packageName: string,
-  cache: ResolutionCache,
-): PackageInfo => {
-  let info = cache.packages.get(packageRoot);
-  if (!info) {
-    const manifest = JSON.parse(
-      readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
-    ) as PackageJson;
-    info = {
-      manifest,
-      resolveImport: selectIconImportResolver(packageName, manifest.version),
-    };
-    cache.packages.set(packageRoot, info);
-  }
-  return info;
-};
-
-const parsePackageSpecifier = (
-  specifier: string,
-): { packageName: string; subpath: string } | null => {
-  if (specifier.startsWith('.') || path.isAbsolute(specifier)) {
-    return null;
-  }
-
-  const parts = specifier.split('/');
-  const packageName = specifier.startsWith('@')
-    ? `${parts[0]}/${parts[1]}`
-    : parts[0];
-  const rest = parts.slice(specifier.startsWith('@') ? 2 : 1).join('/');
-
-  return {
-    packageName,
-    subpath: rest ? `./${rest}` : '.',
-  };
-};
-
-const findPackageRoot = (
-  packageName: string,
-  baseDir: string,
-  cache: ResolutionCache,
-): string | null => {
-  let current = path.resolve(baseDir);
-  const key = JSON.stringify([packageName, current]);
-  const cachedRoot = cache.roots.get(key);
-  if (cachedRoot !== undefined) {
-    return cachedRoot;
-  }
-  while (true) {
-    const candidate = path.join(current, 'node_modules', packageName);
-    if (existsSync(path.join(candidate, 'package.json'))) {
-      cache.roots.set(key, candidate);
-      return candidate;
-    }
-
-    const parent = path.dirname(current);
-    if (parent === current) {
-      cache.roots.set(key, null);
-      return null;
-    }
-    current = parent;
-  }
-};
-
-const pickExportTarget = (value: unknown): string | null => {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-
-  const record = value as Record<string, unknown>;
-  return (
-    pickExportTarget(record.import) ??
-    pickExportTarget(record.default) ??
-    pickExportTarget(record.module) ??
-    pickExportTarget(record.require)
-  );
-};
-
-const resolveExportTarget = (
-  exportsField: unknown,
-  subpath: string,
-): string | null => {
-  if (typeof exportsField === 'string' || Array.isArray(exportsField)) {
-    return subpath === '.' ? pickExportTarget(exportsField) : null;
-  }
-
-  if (!exportsField || typeof exportsField !== 'object') {
-    return null;
-  }
-
-  const exportsRecord = exportsField as Record<string, unknown>;
-
-  const exact = pickExportTarget(exportsRecord[subpath]);
-  if (exact) {
-    return exact;
-  }
-
-  for (const [key, value] of Object.entries(exportsRecord)) {
-    if (!key.includes('*')) {
-      continue;
-    }
-
-    const [prefix, suffix] = key.split('*');
-    if (!subpath.startsWith(prefix) || !subpath.endsWith(suffix)) {
-      continue;
-    }
-
-    const matched = subpath.slice(
-      prefix.length,
-      subpath.length - suffix.length,
-    );
-    const target = pickExportTarget(value);
-    if (target) {
-      return target.replaceAll('*', matched);
-    }
-  }
-
-  return null;
-};
-
-const fileExists = (filePath: string): boolean => {
-  try {
-    return statSync(filePath).isFile();
-  } catch {
-    return false;
-  }
-};
-
-const resolveFileCandidate = (filePath: string): string | null => {
-  const candidates = [
-    filePath,
-    `${filePath}.mjs`,
-    `${filePath}.js`,
-    `${filePath}.cjs`,
-    `${filePath}.jsx`,
-    `${filePath}.ts`,
-    `${filePath}.tsx`,
-    path.join(filePath, 'index.mjs'),
-    path.join(filePath, 'index.js'),
-    path.join(filePath, 'index.cjs'),
-    path.join(filePath, 'index.jsx'),
-    path.join(filePath, 'index.ts'),
-    path.join(filePath, 'index.tsx'),
-  ];
-
-  return candidates.find(fileExists) ?? null;
-};
-
-const resolveFromPackageRoot = (
-  packageRoot: string,
-  subpath: string,
-  packageJson: PackageJson,
-): string | null => {
-  const exportTarget = resolveExportTarget(packageJson.exports, subpath);
-
-  if (exportTarget) {
-    const resolved = resolveFileCandidate(path.join(packageRoot, exportTarget));
-    if (resolved) {
-      return resolved;
-    }
-  }
-
-  if (subpath === '.') {
-    const entry = packageJson.module ?? packageJson.main;
-    if (entry) {
-      return resolveFileCandidate(path.join(packageRoot, entry));
-    }
-  }
-
-  return resolveFileCandidate(path.join(packageRoot, subpath));
-};
-
-const resolveFromBaseDir = (
-  specifier: string,
-  baseDir: string,
-  cache: ResolutionCache,
-): string | null => {
-  const parsed = parsePackageSpecifier(specifier);
-  if (!parsed) {
-    return null;
-  }
-  const packageRoot = findPackageRoot(parsed.packageName, baseDir, cache);
-  return packageRoot
-    ? resolveFromPackageRoot(
-        packageRoot,
-        parsed.subpath,
-        readPackageInfo(packageRoot, parsed.packageName, cache).manifest,
-      )
-    : null;
-};
-
-const resolveImportSpecifier = (
-  specifier: string,
-  options: RenderIconOptions,
-  cache: ResolutionCache,
-): string => {
-  if (path.isAbsolute(specifier)) {
-    const resolved = resolveFileCandidate(specifier);
-    return pathToFileURL(resolved ?? specifier).href;
-  }
-
-  if (specifier.startsWith('.') && options.importer) {
-    const importerPath = options.importer.split('?', 1)[0];
-    const resolved = resolveFileCandidate(
-      path.resolve(path.dirname(importerPath), specifier),
-    );
-    if (resolved) {
-      return pathToFileURL(resolved).href;
-    }
-  }
-
-  if (!options.baseDir) {
-    return specifier;
-  }
-
-  const resolved = resolveFromBaseDir(specifier, options.baseDir, cache);
-  return resolved ? pathToFileURL(resolved).href : specifier;
-};
-
 export const extractSymbolAttributes = (svgMarkup: string): string => {
   const openingAttributes = SVG_OPEN_RE.exec(svgMarkup)?.[1];
   if (!openingAttributes) {
@@ -293,31 +39,21 @@ export const extractSymbolAttributes = (svgMarkup: string): string => {
   return attributes.join(' ');
 };
 
-const pickExport = (
-  moduleExports: Record<string, unknown>,
-  exportName: string,
-): unknown => {
-  if (exportName === 'default') {
-    return moduleExports.default;
+const extractRenderedIcon = (
+  svgMarkup: string,
+  description: string,
+): RenderedIcon => {
+  const symbolBody = SVG_INNER_RE.exec(svgMarkup)?.[1];
+  if (!symbolBody) {
+    throw new Error(
+      `[react-icons-sprite] Unable to extract SVG content for ${description}.`,
+    );
   }
-  const defaultExport = moduleExports.default;
-  const nestedExport =
-    defaultExport && typeof defaultExport === 'object'
-      ? (defaultExport as Record<string, unknown>)[exportName]
-      : undefined;
-  return moduleExports[exportName] ?? nestedExport ?? defaultExport;
-};
-
-const unwrapNestedDefaultExport = (value: unknown): unknown => {
-  if (!value || typeof value !== 'object' || !('default' in value)) {
-    return value;
-  }
-
-  if ('$$typeof' in value) {
-    return value;
-  }
-
-  return (value as { default: unknown }).default;
+  return {
+    symbolBody,
+    viewBox: VIEWBOX_RE.exec(svgMarkup)?.[1] ?? '0 0 24 24',
+    symbolAttributes: extractSymbolAttributes(svgMarkup),
+  };
 };
 
 export const isRenderableComponent = (
@@ -331,8 +67,7 @@ export const isRenderableComponent = (
     return false;
   }
 
-  const maybeExoticComponent = value as Record<string, unknown>;
-  return '$$typeof' in maybeExoticComponent;
+  return '$$typeof' in value;
 };
 
 type FontAwesomeIconTuple = [
@@ -425,80 +160,14 @@ const renderHugeiconsIconDefinition = (
       children,
     ),
   );
-  const svgInner = SVG_INNER_RE.exec(svgMarkup)?.[1];
-
-  if (!svgInner) {
-    throw new Error(
-      '[react-icons-sprite] Unable to extract SVG content for Hugeicons icon.',
-    );
-  }
-
-  return {
-    symbolBody: svgInner,
-    viewBox: '0 0 24 24',
-    symbolAttributes: extractSymbolAttributes(svgMarkup),
-  };
+  return extractRenderedIcon(svgMarkup, 'Hugeicons icon');
 };
 
-const renderIconWithCache = async (
+const renderLoadedIcon = (
   pack: string,
   exportName: string,
-  options: RenderIconOptions,
-  cache: ResolutionCache,
-): Promise<RenderedIcon> => {
-  let packageRoot: string | null = null;
-  let packageInfo: PackageInfo | undefined;
-  const packageName = parsePackageSpecifier(pack)?.packageName ?? pack;
-  if (!options.importPath && hasVersionedIconResolver(pack)) {
-    const baseDir = options.baseDir ?? process.cwd();
-    const importerDir = options.importer
-      ? path.dirname(options.importer.split('?', 1)[0])
-      : baseDir;
-    packageRoot =
-      findPackageRoot(packageName, importerDir, cache) ??
-      findPackageRoot(packageName, baseDir, cache);
-    if (packageRoot) {
-      packageInfo = readPackageInfo(packageRoot, packageName, cache);
-    }
-  }
-
-  const importPath =
-    options.importPath ?? packageInfo?.resolveImport(pack, exportName) ?? pack;
-  let specifier = importPath;
-  if (packageRoot && packageInfo) {
-    const subpath = parsePackageSpecifier(importPath)?.subpath ?? '.';
-    specifier =
-      resolveFromPackageRoot(packageRoot, subpath, packageInfo.manifest) ??
-      path.join(packageRoot, subpath === '.' ? 'index.js' : subpath);
-  }
-  if (
-    pack === 'lucide-react' &&
-    packageRoot &&
-    importPath.startsWith(`${pack}/`) &&
-    !fileExists(specifier)
-  ) {
-    // Renamed icons and unusual spellings are still exported by the entry module.
-    specifier = path.join(
-      packageRoot,
-      `dist/esm/lucide-react${path.extname(specifier)}`,
-    );
-  }
-  const imported = (await import(
-    resolveImportSpecifier(specifier, options, cache)
-  )) as Record<string, unknown>;
-  const iconComponent = unwrapNestedDefaultExport(
-    pickExport(
-      imported,
-      exportName === 'default' &&
-        imported.default === undefined &&
-        packageRoot &&
-        importPath !== pack &&
-        pack !== packageName
-        ? (pack.split('/').at(-1) ?? exportName)
-        : exportName,
-    ),
-  );
-
+  iconComponent: unknown,
+): RenderedIcon => {
   if (isFontAwesomeIconDefinition(iconComponent)) {
     return renderFontAwesomeIconDefinition(iconComponent);
   }
@@ -514,36 +183,26 @@ const renderIconWithCache = async (
     );
   }
 
-  const svgMarkup = renderToStaticMarkup(
-    createElement(iconComponent as ComponentType<Record<string, unknown>>),
-  );
-
-  const svgInner = SVG_INNER_RE.exec(svgMarkup)?.[1];
-  if (!svgInner) {
-    throw new Error(
-      `[react-icons-sprite] Unable to extract SVG content for "${exportName}" from "${pack}".`,
-    );
-  }
-
-  const viewBox = VIEWBOX_RE.exec(svgMarkup)?.[1] ?? '0 0 24 24';
-  const symbolAttributes = extractSymbolAttributes(svgMarkup);
-
-  return {
-    symbolBody: svgInner,
-    viewBox,
-    symbolAttributes,
-  };
+  const svgMarkup = renderToStaticMarkup(createElement(iconComponent));
+  return extractRenderedIcon(svgMarkup, `"${exportName}" from "${pack}"`);
 };
 
-// Share resolution work within a sprite build; each new build starts fresh.
+// Loading can start during transforms; rendering remains at asset emission.
 export const createIconRenderer = () => {
-  const cache: ResolutionCache = { roots: new Map(), packages: new Map() };
-  return (pack: string, exportName: string, options: RenderIconOptions = {}) =>
-    renderIconWithCache(pack, exportName, options, cache);
+  const load = createIconLoader();
+  const render = (
+    pack: string,
+    exportName: string,
+    options: IconLoadOptions = {},
+  ) =>
+    load(pack, exportName, options).then((component) =>
+      renderLoadedIcon(pack, exportName, component),
+    );
+  return Object.assign(render, { preload: load.preload });
 };
 
 export const renderIcon = (
   pack: string,
   exportName: string,
-  options: RenderIconOptions = {},
+  options: IconLoadOptions = {},
 ): Promise<RenderedIcon> => createIconRenderer()(pack, exportName, options);
